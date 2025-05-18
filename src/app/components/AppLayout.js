@@ -1,46 +1,130 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
 
 export default function AppLayout({ children }) {
-    const [collapsed, setCollapsed] = useState(false);
+  const [showIcon, setShowIcon] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
-    const toggleSidebar = () =>  setCollapsed(prev => !prev);{}
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowIcon(window.scrollY > 50);
+      setShowScrollTop(window.scrollY > 200);
+    };
 
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Sidebar */}
-      <aside className={`bg-gray-900 text-white flex flex-col transition-all duration-300 ${collapsed ? "w-20" : "w-64"}`}>
-        <h2 className="text-xl font-bold mb-4">CEH</h2>
-        <SidebarLink href="/" label="Home" />
-        <SidebarLink href="/quiz" label="Quiz" />
-        <SidebarLink href="/about" label="About" />
-        <SidebarLink href="/contact" label="Contact" />
-      </aside>
+    <div className="min-h-screen bg-indigo-50 font-sans relative">
+      {/* Floating Nav Icon (Top Right) */}
+      {showIcon ? (
+        <motion.div
+          initial={{ top: 16, left: "50%", x: "-50%" }}
+          animate={{ top: 16, left: "auto", right: 16, x: 0 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="fixed z-40"
+        >
+          <button
+            className="w-12 h-12 flex items-center justify-center bg-black text-white rounded-full shadow-lg hover:bg-gray-800 transition"
+            onClick={() => alert("Expand nav or open drawer")}
+          >
+            ☰
+          </button>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ top: 16, left: "auto", right: 16, x: 0 }}
+          animate={{ top: 16, left: "50%", x: "-50%" }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          className="fixed z-40"
+        >
+          <SlideTabs />
+        </motion.div>
+      )}
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <motion.button
+          onClick={scrollToTop}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="fixed bottom-6 right-6 z-40 w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-800 transition"
+        >
+          ↑
+        </motion.button>
+      )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <main className="pt-28 px-6">{children}</main>
     </div>
   );
 }
 
-function SidebarLink({ href, label, icon, collapsed }) {
+function SlideTabs() {
+  const [position, setPosition] = useState({
+    left: 0,
+    width: 0,
+    opacity: 0,
+  });
+
   return (
-    <Link
-      href={href}
-      className="relative group flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-sm"
+    <ul
+      onMouseLeave={() => {
+        setPosition((pv) => ({
+          ...pv,
+          opacity: 0,
+        }));
+      }}
+      className="relative mx-auto flex w-fit rounded-full border border-black bg-white p-1"
     >
-      {icon}
-      {!collapsed ? (
-        <span>{label}</span>
-      ) : (
-        <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 w-max whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all z-50 shadow-lg">
-          {label}
-          <span className="absolute top-1/2 left-0 -translate-y-1 w-0 h-0 border-t-4 border-l-4 border-gray-800 border-r-4" />
-        </span>
-      )}
-    </Link>
+      <NavTab setPosition={setPosition} href="/">Home</NavTab>
+      <NavTab setPosition={setPosition} href="/quiz">Quiz</NavTab>
+      <NavTab setPosition={setPosition} href="/about">About</NavTab>
+      <NavTab setPosition={setPosition} href="/contact">Contact</NavTab>
+
+      <Cursor position={position} />
+    </ul>
+  );
+}
+
+function NavTab({ children, setPosition, href }) {
+  const ref = useRef(null);
+
+  return (
+    <li
+      ref={ref}
+      onMouseEnter={() => {
+        if (!ref?.current) return;
+
+        const { width } = ref.current.getBoundingClientRect();
+
+        setPosition({
+          left: ref.current.offsetLeft,
+          width,
+          opacity: 1,
+        });
+      }}
+      className="relative z-10 block cursor-pointer px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base"
+    >
+      <Link href={href}>{children}</Link>
+    </li>
+  );
+}
+
+function Cursor({ position }) {
+  return (
+    <motion.li
+      animate={{ ...position }}
+      className="absolute z-0 h-7 rounded-full bg-black md:h-12"
+    />
   );
 }
