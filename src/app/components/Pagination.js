@@ -28,50 +28,63 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, setsPer
     const showNextEllipsis = endPage < totalPages;
 
     return (
-        <div className="flex mt-4 gap-2 items-center justify-center">
-            {/* Previous Button */}
-            <button
-                onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border rounded-md disabled:opacity-50 hover:bg-gray-100"
-            >
-                <ChevronLeft size={24} />
-            </button>
+        <div className="flex flex-wrap gap-2 mt-4 items-center justify-center text-sm sm:text-base">
+  {/* Previous Button */}
+  <button
+    onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+    disabled={currentPage === 1}
+    className="px-3 py-1.5 sm:px-4 sm:py-2 border rounded-md disabled:opacity-50 hover:bg-gray-100"
+  >
+    <ChevronLeft size={20} />
+  </button>
 
-            {/* Previous Ellipsis */}
-            {showPrevEllipsis && (
-                <span className="px-4 py-2 text-gray-500">...</span>
-            )}
+  {/* Previous Ellipsis */}
+  {showPrevEllipsis && (
+    <span className="px-2 sm:px-4 py-1.5 text-gray-500">...</span>
+  )}
 
-            {/* Page Numbers */}
-            {pageNumbers.map((number) => (
-                <button
-                    key={number}
-                    onClick={() => onPageChange(number)}
-                    className={`px-4 py-2 border rounded-md transition-colors ${
-                        currentPage === number
-                            ? 'bg-cyan-400 text-white'
-                            : 'bg-white hover:bg-gray-100'
-                    }`}
-                >
-                    {number}
-                </button>
-            ))}
+  {/* Page Numbers */}
+  {pageNumbers
+    .filter((_, idx) => {
+      if (typeof window !== 'undefined' && window.innerWidth < 640) {
+        // Show only 5 pages on small screens
+        const half = 5;
+        const start = Math.max(currentPage - half - 1, 0);
+        const end = Math.min(currentPage + half, pageNumbers.length);
+        return idx >= start && idx < end;
+      }
+      return true;
+    })
+    .map((number) => (
+      <button
+        key={number}
+        onClick={() => onPageChange(number)}
+        className={`px-3 py-1.5 sm:px-4 sm:py-2 border rounded-md transition-colors ${
+          currentPage === number
+            ? 'bg-cyan-400 text-white'
+            : 'bg-white hover:bg-gray-100'
+        }`}
+      >
+        {number}
+      </button>
+    ))}
 
-            {/* Next Ellipsis */}
-            {showNextEllipsis && (
-                <span className="px-4 py-2 text-gray-500">...</span>
-            )}
+  {/* Next Ellipsis */}
+  {showNextEllipsis && (
+    <span className="px-2 sm:px-4 py-1.5 text-gray-500">...</span>
+  )}
 
-            {/* Next Button */}
-            <button
-                onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 border rounded-md disabled:opacity-50 hover:bg-gray-100"
-            >
-                <ChevronRight size={24} />
-            </button>
-        </div>
+  {/* Next Button */}
+  <button
+    onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+    disabled={currentPage === totalPages}
+    className="px-3 py-1.5 sm:px-4 sm:py-2 border rounded-md disabled:opacity-50 hover:bg-gray-100"
+  >
+    <ChevronRight size={20} />
+  </button>
+</div>
+
+
     );
 };
 
