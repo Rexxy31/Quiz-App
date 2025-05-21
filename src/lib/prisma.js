@@ -6,7 +6,9 @@ let prisma;
 
 if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = new PrismaClient({
-    log: ['query'], // optional: logs SQL queries
+    __internal: {
+      usePreparedStatements: false,
+    },
   });
 }
 
