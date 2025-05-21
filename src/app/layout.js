@@ -1,5 +1,5 @@
 import "./globals.css";
-import AppLayout from "./components/AppLayout"; // adjust path if needed
+import AppLayout from "./components/AppLayout"; // adjust a path if needed
 
 export const metadata = {
   title: "cy-sec",

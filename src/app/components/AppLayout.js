@@ -70,11 +70,11 @@ export default function AppLayout({ children }) {
             <Link href="/" onClick={() => setMenuOpen(false)}>
               Home
             </Link>
-            <Link href="/quiz" onClick={() => setMenuOpen(false)}>
-              Quiz
+            <Link href="/Learn" onClick={() => setMenuOpen(false)}>
+              Learn
             </Link>
-            <Link href="/about" onClick={() => setMenuOpen(false)}>
-              About
+            <Link href="/Test" onClick={() => setMenuOpen(false)}>
+              Test
             </Link>
             <Link href="/contact" onClick={() => setMenuOpen(false)}>
               Contact
@@ -128,11 +128,11 @@ function SlideTabs({ scrolled }) {
       <NavTab scrolled={scrolled} setPosition={setPosition} href="/">
         Home
       </NavTab>
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/quiz">
-        Quiz
+      <NavTab scrolled={scrolled} setPosition={setPosition} href="/Learn">
+        Learn
       </NavTab>
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/about">
-        About
+      <NavTab scrolled={scrolled} setPosition={setPosition} href="/Test">
+        Test
       </NavTab>
       <NavTab scrolled={scrolled} setPosition={setPosition} href="/contact">
         Contact
