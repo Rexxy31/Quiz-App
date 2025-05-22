@@ -32,10 +32,17 @@ export default function Page() {
                     options,
                 };
             });
-            setQuestions(normalized);
+            setQuestions(shuffleArray(normalized));
         };
         fetchQuestions();
     }, []);
+
+	function shuffleArray(array) {
+		return array
+			.map(value => ({value, sort: Math.random()}))
+			.sort((a, b) => a.sort - b.sort)
+			.map(({value}) => value);
+	}
 
     const indexOfLastQuestion = currentPage * ItemsPerPage;
     const indexOfFirstQuestion = indexOfLastQuestion - ItemsPerPage;
@@ -154,6 +161,14 @@ export default function Page() {
                     </div>
                 );
             })}
+	        <div>
+		        <button
+			        onClick={() => setQuestions(shuffleArray([...questions]))}
+			        className="mb-4 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+		        >
+			        Shuffle Questions
+		        </button>
+	        </div>
             <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
