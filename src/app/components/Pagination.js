@@ -59,12 +59,15 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, setsPer
       <button
         key={number}
         onClick={() => onPageChange(number)}
-        className={`px-3 py-1.5 sm:px-4 sm:py-2 border rounded-md transition-colors ${
-          currentPage === number
-            ? 'bg-cyan-400 text-white'
-            : 'bg-white hover:bg-gray-100'
-        }`}
-      >
+         className={`
+                        px-4 py-2 rounded border
+                        ${currentPage === number
+                            ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500 dark:text-white'
+                            : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100 hover:text-black dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-white'
+                        }
+                        transition
+                    `}
+                >
         {number}
       </button>
     ))}
