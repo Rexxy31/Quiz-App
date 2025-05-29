@@ -1,9 +1,7 @@
-"use client";
-
-export default function Page() {
-    return (
-        <div>
-            <h1>Leaderboards</h1>
-        </div>
-    );
+export default function LeaderboardsPage() {
+	return (
+		<div>
+			Leaderboards
+		</div>
+	);
 }
