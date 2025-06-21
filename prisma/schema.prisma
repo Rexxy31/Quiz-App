@@ -7,27 +7,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model correct_answers {
-  id             Int        @id @default(autoincrement())
-  question_id    Int?
-  correct_option String
-  created_at     DateTime?  @default(now()) @db.Timestamp(6)
-  questions      questions? @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-model options {
-  id            Int        @id @default(autoincrement())
-  question_id   Int?
-  option_letter String
-  option_text   String
-  created_at    DateTime?  @default(now()) @db.Timestamp(6)
-  questions     questions? @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-}
-
-model questions {
-  id              Int               @id @default(autoincrement())
+model Question {
+  id              String          @id @default(cuid())
   question_text   String
-  created_at      DateTime?         @default(now()) @db.Timestamp(6)
-  correct_answers correct_answers[]
-  options         options[]
+  options         Json
+  correct_answers CorrectAnswer[]
+  TestResult      TestResult?     @relation(fields: [testResultId], references: [id])
+  testResultId    String?
+}
+
+model CorrectAnswer {
+  id             String   @id @default(cuid())
+  question       Question @relation(fields: [questionId], references: [id])
+  questionId     String
+  correct_option String
+}
+
+model User {
+  id            String       @id @default(cuid())
+  name          String?
+  email         String?      @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String       @default("USER")
+  accounts      Account[]
+  sessions      Session[]
+  TestResult    TestResult[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model TestResult {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    String
+  score     Int
+  createdAt DateTime   @default(now())
+  questions Question[]
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+  status    String   @default("PENDING") // PENDING, READ, REPLIED
 }

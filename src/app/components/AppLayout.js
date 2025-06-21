@@ -2,180 +2,217 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { usePathname } from 'next/navigation';
+import { Shield, User, Settings } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 
 export default function AppLayout({ children }) {
 	const [isMounted, setIsMounted] = useState(false);
-  const [showIcon, setShowIcon] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+	const [showScrollTop, setShowScrollTop] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [userMenuOpen, setUserMenuOpen] = useState(false);
+	const pathname = usePathname();
+	const { data: session, status } = useSession();
 
+	useEffect(() => {
+		setIsMounted(true);
 
-  useEffect(() => {
-    setIsMounted(true);
+		const handleScroll = () => {
+			setShowScrollTop(window.scrollY > 200);
+		};
 
-    const handleScroll = () => {
-      setShowIcon(window.scrollY > 50);
-      setShowScrollTop(window.scrollY > 200);
-    };
+		window.addEventListener("scroll", handleScroll);
+		return () => window.removeEventListener("scroll", handleScroll);
+	}, []);
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+	if (!isMounted) return null;
 
-  if (!isMounted) return null;
+	const scrollToTop = () => {
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	};
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+	const handleNavClick = () => {
+		setMenuOpen(false);
+	};
 
-  return (
-    <div className="min-h-screen bg-indigo-50 font-sans relative">
-      {/* Floating Nav Icon (Top Right) */}
-      {showIcon ? (
-        <motion.div
-          initial={{ top: 16, left: "50%", x: "-50%" }}
-          animate={{ top: 16, left: "auto", right: 16, x: 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="fixed z-40"
-        >
-          <button
-            className="w-12 h-12 flex items-center justify-center bg-black text-white rounded-full shadow-lg hover:bg-gray-800 transition"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            ☰
-          </button>
-        </motion.div>
-      ) : (
-        <motion.div
-          initial={{ top: 16, left: "auto", right: 16, x: 0 }}
-          animate={{ top: 16, left: "50%", x: "-50%" }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          className="fixed z-40 block"
-        >
-          <SlideTabs scrolled={showIcon} />
-        </motion.div>
-      )}
+	const navLinks = [
+		{ href: "/", label: "Home" },
+		{ href: "/Learn", label: "Learn" },
+		{ href: "/Test", label: "Test" },
+		{ href: "/contact", label: "Contact" },
+		{ href: "/leaderboards", label: "Leaderboards" },
+	];
 
-      {/* Mobile Drawer Menu */}
-      {menuOpen && (
-        <motion.div
-          initial={{ x: "100%" }}
-          animate={{ x: 0 }}
-          exit={{ x: "100%" }}
-          transition={{ duration: 0.3 }}
-          className="fixed top-0 right-0 z-50 w-32 bg-white shadow-lg p-6 space-y-6 md:hidden"
-        >
-          <button
-            className="text-black text-xl absolute top-4 right-4"
-            onClick={() => setMenuOpen(false)}
-          >
-            ✕
-          </button>
-          <nav className="flex flex-col space-y-4 text-lg">
-	            <Link href="/" onClick={() => setMenuOpen(false)}>Home</Link>
-	            <Link href="/Learn" onClick={() => setMenuOpen(false)}>Learn</Link>
-	            <Link href="/Test" onClick={() => setMenuOpen(false)}>Test</Link>
-	            <Link href="/contact" onClick={() => setMenuOpen(false)}>Contact</Link>
-	            <Link href="/leaderboards" onClick={() => setMenuOpen(false)}>Leaderboards</Link>
-          </nav>
-        </motion.div>
-      )}
+	return (
+		<div className="min-h-screen bg-gray-100 font-sans relative">
+			{/* Navigation Bar */}
+			<nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div className="flex justify-between items-center h-16">
+						{/* Logo */}
+						<div className="flex-shrink-0">
+							<Link href="/" className="flex items-center space-x-2 text-xl font-bold text-gray-800">
+								<Shield className="w-7 h-7 text-blue-600" />
+								<span>CEH Quiz</span>
+							</Link>
+						</div>
 
-      {/* Scroll to Top Button */}
-      {showScrollTop && (
-        <motion.button
-          onClick={scrollToTop}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="fixed bottom-6 right-6 z-40 w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-800 transition"
-        >
-          ↑
-        </motion.button>
-      )}
+						{/* Desktop Navigation */}
+						<div className="hidden md:flex items-center space-x-1">
+							{navLinks.map(({ href, label }) => (
+								<Link
+									key={href}
+									href={href}
+									className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+										pathname === href
+											? 'bg-blue-100 text-blue-700'
+											: 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+									}`}
+								>
+									{label}
+								</Link>
+							))}
+							
+							{/* Admin Link - Only show if user is admin */}
+							{status === 'authenticated' && session.user.role === 'ADMIN' && (
+								<Link 
+									href="/admin" 
+									className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center space-x-1 ${
+										pathname === '/admin'
+											? 'bg-purple-100 text-purple-700'
+											: 'bg-purple-600 text-white hover:bg-purple-700'
+									}`}
+								>
+									<Settings className="w-4 h-4" />
+									<span>Admin</span>
+								</Link>
+							)}
+						</div>
 
-      {/* Main Content */}
-      <main className="pt-28 px-6">{children}</main>
-    </div>
-  );
-}
+						{/* User Menu */}
+						<div className="hidden md:flex items-center space-x-3">
+							{status === 'authenticated' ? (
+								<div className="relative">
+									<button
+										onClick={() => setUserMenuOpen(!userMenuOpen)}
+										className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors duration-200"
+									>
+										<User className="w-4 h-4" />
+										<span>{session.user.name}</span>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+										</svg>
+									</button>
+									
+									{userMenuOpen && (
+										<div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
+											<div className="px-4 py-2 text-sm text-gray-500 border-b border-gray-100">
+												{session.user.role === 'ADMIN' ? 'Administrator' : 'User'}
+											</div>
+											<button
+												onClick={() => { signOut(); setUserMenuOpen(false); }}
+												className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+											>
+												Sign out
+											</button>
+										</div>
+									)}
+								</div>
+							) : (
+								<Link
+									href="/login"
+									className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 bg-blue-600 text-white hover:bg-blue-700"
+								>
+									Login
+								</Link>
+							)}
+						</div>
 
-function SlideTabs({ scrolled }) {
-  const [position, setPosition] = useState({
-    left: 0,
-    width: 0,
-    opacity: 0,
-  });
+						{/* Mobile Menu Button */}
+						<div className="md:hidden flex items-center">
+							<button
+								className="p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100"
+								onClick={() => setMenuOpen(!menuOpen)}
+								aria-label="Open main menu"
+							>
+								<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={menuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+								</svg>
+							</button>
+						</div>
+					</div>
+				</div>
 
-  return (
-    <ul
-      onMouseLeave={() => {
-        setPosition((pv) => ({
-          ...pv,
-          opacity: 0,
-        }));
-      }}
-      className={`
-        relative mx-auto flex min-w-0
-        ${scrolled ? "max-w-full rounded-full border-2 border-black bg-white p-1" : "w-full rounded-none bg-black p-2"}
-        sm:w-fit sm:rounded-full sm:bg-white sm:p-1 sm:border-2 sm:border-black
-        overflow-x-auto no-scrollbar whitespace-nowrap
-      `}
-      style={{ WebkitOverflowScrolling: "touch" }} // iOS smooth scroll
-    >
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/">
-        Home
-      </NavTab>
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/Learn">
-        Learn
-      </NavTab>
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/Test">
-        Test
-      </NavTab>
-      <NavTab scrolled={scrolled} setPosition={setPosition} href="/contact">
-        Contact
-      </NavTab>
-	    <NavTab scrolled={scrolled} setPosition={setPosition} href="/leaderboards">
-		    Leaderboards
-	    </NavTab>
-      <Cursor position={position} />
-    </ul>
-  );
-}
+				{/* Mobile Navigation */}
+				{menuOpen && (
+					<div className="md:hidden border-t border-gray-200">
+						<div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+							{navLinks.map(({ href, label }) => (
+								<Link
+									key={href}
+									href={href}
+									onClick={handleNavClick}
+									className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
+										pathname === href
+											? 'bg-blue-100 text-blue-700'
+											: 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+									}`}
+								>
+									{label}
+								</Link>
+							))}
+							{status === 'authenticated' ? (
+								<>
+									{session.user.role === 'ADMIN' && (
+										<Link 
+											href="/admin" 
+											onClick={handleNavClick} 
+											className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 flex items-center space-x-2 ${
+												pathname === '/admin'
+													? 'bg-purple-100 text-purple-700'
+													: 'bg-purple-600 text-white hover:bg-purple-700'
+											}`}
+										>
+											<Settings className="w-4 h-4" />
+											<span>Admin</span>
+										</Link>
+									)}
+									<div className="px-3 py-2 text-sm text-gray-500 border-t border-gray-200 mt-2 pt-2">
+										Welcome, {session.user.name}
+									</div>
+									<button 
+										onClick={() => { signOut(); handleNavClick(); }} 
+										className="w-full text-left block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 text-red-600 hover:bg-red-50"
+									>
+										Sign out
+									</button>
+								</>
+							) : (
+								<Link
+									href="/login"
+									onClick={handleNavClick}
+									className="block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 bg-blue-600 text-white hover:bg-blue-700"
+								>
+									Login
+								</Link>
+							)}
+						</div>
+					</div>
+				)}
+			</nav>
 
-function NavTab({ children, setPosition, href, scrolled }) {
-  const ref = React.useRef(null);
+			{/* Scroll to Top Button */}
+			{showScrollTop && (
+				<button
+					onClick={scrollToTop}
+					className="fixed bottom-6 right-6 z-40 w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition-all duration-300"
+				>
+					<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+				</button>
+			)}
 
-  return (
-    <li
-      ref={ref}
-      onMouseEnter={() => {
-        if (!ref?.current) return;
-
-        const { width } = ref.current.getBoundingClientRect();
-
-        setPosition({
-          left: ref.current.offsetLeft,
-          width,
-          opacity: 1,
-        });
-      }}
-      className={`relative z-10 inline-block cursor-pointer px-3 py-1.5 text-xs uppercase min-w-0
-        ${scrolled ? "text-black" : "text-white"}
-        md:px-5 md:py-3 md:text-base md:text-black md:hover:text-white
-      `}
-    >
-      <Link href={href}>{children}</Link>
-    </li>
-  );
-}
-
-function Cursor({ position }) {
-  return (
-    <motion.li
-      animate={{ ...position }}
-      className="absolute z-0 h-7 rounded-full bg-black md:h-12"
-    />
-  );
+			{/* Main Content */}
+			<main className="pt-20 px-4 sm:px-6 lg:px-8">{children}</main>
+		</div>
+	);
 }
