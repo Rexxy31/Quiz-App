@@ -57,7 +57,7 @@ export default function ContactPage() {
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Have questions about our CEH Quiz App? Need help with your studies? 
-            We're here to help you succeed in your cybersecurity journey.
+            We&apos;re here to help you succeed in your cybersecurity journey.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ export default function ContactPage() {
                     <h3 className="text-lg font-medium text-gray-900">Email</h3>
                     <p className="text-gray-600">therealyogism@gmail.com</p>
                     <p className="text-sm text-gray-500 mt-1">
-                      We'll respond within 24 hours
+                      We&apos;ll respond within 24 hours
                     </p>
                   </div>
                 </div>
@@ -88,7 +88,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">Contact Form</h3>
-                    <p className="text-gray-600">Fill out the form and we'll get back to you</p>
+                    <p className="text-gray-600">Fill out the form and we&apos;ll get back to you</p>
                     <p className="text-sm text-gray-500 mt-1">
                       All queries are reviewed by our team
                     </p>
@@ -134,7 +134,7 @@ export default function ContactPage() {
             {submitStatus === 'success' && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
                 <p className="text-green-800">
-                  Thank you! Your message has been sent successfully. We'll get back to you soon.
+                  Thank you! Your message has been sent successfully. We&apos;ll get back to you soon.
                 </p>
               </div>
             )}
