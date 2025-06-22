@@ -37,8 +37,8 @@ export default function AppLayout({ children }) {
 
 	const navLinks = [
 		{ href: "/", label: "Home" },
-		{ href: "/Learn", label: "Learn" },
-		{ href: "/Test", label: "Test" },
+		{ href: "/learn", label: "Learn" },
+		{ href: "/test", label: "Test" },
 		{ href: "/contact", label: "Contact" },
 		{ href: "/leaderboards", label: "Leaderboards" },
 	];
