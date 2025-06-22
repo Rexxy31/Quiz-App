@@ -17,7 +17,7 @@ export default function HomePage() {
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <a
-            href="/Learn"
+            href="/learn"
             className="inline-block px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg shadow-lg hover:bg-blue-700 transition-transform transform hover:scale-105"
           >
             Study Mode
