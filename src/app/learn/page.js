@@ -5,8 +5,22 @@ import Pagination from "@/app/components/Pagination";
 
 export default function Page() {
     const [questions, setQuestions] = useState([]);
-    const [answers, setAnswers] = useState({});
-    const [submitted, setSubmitted] = useState({});
+    const [answers, setAnswers] = useState(() => {
+        // Restore answers from localStorage
+        try {
+            return JSON.parse(localStorage.getItem('learn-answers')) || {};
+        } catch {
+            return {};
+        }
+    });
+    const [submitted, setSubmitted] = useState(() => {
+        // Restore submitted from localStorage
+        try {
+            return JSON.parse(localStorage.getItem('learn-submitted')) || {};
+        } catch {
+            return {};
+        }
+    });
     const [currentPage, setCurrentPage] = useState(1);
     const [ItemsPerPage] = useState(10);
     const questionRefs = useRef([]);
@@ -35,10 +49,37 @@ export default function Page() {
                     options,
                 };
             });
-            setQuestions(shuffleArray(normalized));
+
+            // --- Persistence logic start ---
+            // Get answered questions and order from localStorage
+            const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+            let order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
+
+            let orderedQuestions;
+            if (order && Array.isArray(order) && order.length === normalized.length) {
+                // Use saved order
+                orderedQuestions = order.map(id => normalized.find(q => q.id === id)).filter(Boolean);
+            } else {
+                // Shuffle and save order
+                orderedQuestions = shuffleArray(normalized);
+                localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
+            }
+
+            // Filter out answered questions
+            setQuestions(orderedQuestions);
         };
         fetchQuestions();
     }, []);
+
+    // Persist answers to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem('learn-answers', JSON.stringify(answers));
+    }, [answers]);
+
+    // Persist submitted to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('learn-submitted', JSON.stringify(submitted));
+    }, [submitted]);
 
 	function shuffleArray(array) {
 		return array
@@ -72,10 +113,17 @@ export default function Page() {
     };
 
     const handleSubmit = (questionId, idx) => {
-        setSubmitted((prev) => ({
-            ...prev,
-            [questionId]: true,
-        }));
+        setSubmitted((prev) => {
+            const updated = { ...prev, [questionId]: true };
+            // Save to localStorage
+            const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+            if (!answeredIds.includes(questionId)) {
+                answeredIds.push(questionId);
+                localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
+            }
+            // localStorage for submitted is handled by useEffect
+            return updated;
+        });
         // Scroll to next unanswered question
         setTimeout(() => {
             if (questionRefs.current[idx + 1]) {
