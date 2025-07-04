@@ -11,27 +11,28 @@ model Question {
   id              String          @id @default(cuid())
   question_text   String
   options         Json
+  testResultId    String?
   correct_answers CorrectAnswer[]
   TestResult      TestResult?     @relation(fields: [testResultId], references: [id])
-  testResultId    String?
 }
 
 model CorrectAnswer {
   id             String   @id @default(cuid())
-  question       Question @relation(fields: [questionId], references: [id])
   questionId     String
   correct_option String
+  question       Question @relation(fields: [questionId], references: [id])
 }
 
 model User {
-  id            String       @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String?
-  email         String?      @unique
+  email         String?        @unique
   emailVerified DateTime?
   image         String?
   password      String?
-  role          String       @default("USER")
+  role          String         @default("USER")
   accounts      Account[]
+  learnProgress LearnProgress?
   sessions      Session[]
   TestResult    TestResult[]
 }
@@ -42,15 +43,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -73,11 +73,11 @@ model VerificationToken {
 
 model TestResult {
   id        String     @id @default(cuid())
-  user      User       @relation(fields: [userId], references: [id])
   userId    String
   score     Int
   createdAt DateTime   @default(now())
   questions Question[]
+  user      User       @relation(fields: [userId], references: [id])
 }
 
 model Contact {
@@ -85,7 +85,15 @@ model Contact {
   name      String
   email     String
   subject   String
-  message   String   @db.Text
+  message   String
   createdAt DateTime @default(now())
-  status    String   @default("PENDING") // PENDING, READ, REPLIED
+  status    String   @default("PENDING")
+}
+
+model LearnProgress {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  answeredIds Json
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
 }

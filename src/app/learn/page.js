@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Pagination from "@/app/components/Pagination";
+import { useSession } from 'next-auth/react';
 
 export default function Page() {
+    const { data: session, status } = useSession();
     const [questions, setQuestions] = useState([]);
     const [answers, setAnswers] = useState(() => {
         // Restore answers from localStorage
@@ -51,9 +53,15 @@ export default function Page() {
             });
 
             // --- Persistence logic start ---
-            // Get answered questions and order from localStorage
-            const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
-            let order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
+            // Only use localStorage for guests (not logged in)
+            let answeredIds = [];
+            let order = null;
+            
+            if (status !== 'authenticated') {
+                // For guests, use localStorage
+                answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+                order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
+            }
 
             let orderedQuestions;
             if (order && Array.isArray(order) && order.length === normalized.length) {
@@ -62,24 +70,71 @@ export default function Page() {
             } else {
                 // Shuffle and save order
                 orderedQuestions = shuffleArray(normalized);
-                localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
+                if (status !== 'authenticated') {
+                    localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
+                }
             }
 
-            // Filter out answered questions
+            // Set questions first
             setQuestions(orderedQuestions);
+
+            // Fetch progress from backend if logged in
+            if (status === 'authenticated') {
+                console.log('Fetching learn progress from backend...');
+                fetch('/api/learn-progress')
+                    .then(res => {
+                        console.log('Learn progress API response status:', res.status);
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log('Learn progress data received:', data);
+                        if (Array.isArray(data.answeredIds) && data.answeredIds.length > 0) {
+                            console.log('Setting submitted state for', data.answeredIds.length, 'answered questions');
+                            // Set submitted state for answered questions
+                            setSubmitted(prev => {
+                                const updated = { ...prev };
+                                data.answeredIds.forEach(id => { updated[id] = true; });
+                                console.log('Updated submitted state:', updated);
+                                return updated;
+                            });
+                        } else {
+                            console.log('No answered questions found in backend');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching learn progress:', error);
+                    });
+            }
         };
         fetchQuestions();
-    }, []);
+    }, [status]);
 
-    // Persist answers to localStorage whenever they change
+    // Reorder questions to show answered first, then unanswered (only when submitted changes)
     useEffect(() => {
-        localStorage.setItem('learn-answers', JSON.stringify(answers));
-    }, [answers]);
-
-    // Persist submitted to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('learn-submitted', JSON.stringify(submitted));
+        if (questions.length > 0 && Object.keys(submitted).length > 0) {
+            const answeredQuestions = questions.filter(q => submitted[q.id]);
+            const unansweredQuestions = questions.filter(q => !submitted[q.id]);
+            const reorderedQuestions = [...answeredQuestions, ...unansweredQuestions];
+            setQuestions(reorderedQuestions);
+        }
     }, [submitted]);
+
+    // Persist answers to localStorage whenever they change (only for guests)
+    useEffect(() => {
+        if (status !== 'authenticated') {
+            localStorage.setItem('learn-answers', JSON.stringify(answers));
+        }
+    }, [answers, status]);
+
+    // Persist submitted to localStorage whenever it changes (only for guests)
+    useEffect(() => {
+        if (status !== 'authenticated') {
+            localStorage.setItem('learn-submitted', JSON.stringify(submitted));
+        }
+    }, [submitted, status]);
 
 	function shuffleArray(array) {
 		return array
@@ -115,11 +170,38 @@ export default function Page() {
     const handleSubmit = (questionId, idx) => {
         setSubmitted((prev) => {
             const updated = { ...prev, [questionId]: true };
-            // Save to localStorage
-            const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
-            if (!answeredIds.includes(questionId)) {
-                answeredIds.push(questionId);
-                localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
+            // Save to localStorage for guests
+            if (status !== 'authenticated') {
+                const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+                if (!answeredIds.includes(questionId)) {
+                    answeredIds.push(questionId);
+                    localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
+                }
+            } else {
+                // Save to backend for logged-in users
+                const answeredIds = Object.keys(updated); // Use the updated state, not prev
+                console.log('Saving to backend:', { questionId, answeredIds });
+                fetch('/api/learn-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answeredIds }),
+                })
+                .then(res => {
+                    console.log('Backend save response status:', res.status);
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Backend save response:', data);
+                    console.log('Progress saved successfully to backend');
+                })
+                .catch(error => {
+                    console.error('Error saving to backend:', error);
+                    // Optionally show user an error message
+                    alert('Failed to save progress. Please try again.');
+                });
             }
             // localStorage for submitted is handled by useEffect
             return updated;
@@ -137,13 +219,69 @@ export default function Page() {
     const totalQuestions = questions.length;
     const progressPercent = totalQuestions ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
 
+    const handleResetProgress = () => {
+        const confirmed = window.confirm(
+            'Are you sure you want to reset your learn progress? This will clear all your answered questions and you will need to start over. This action cannot be undone.'
+        );
+        
+        if (confirmed) {
+            // Clear submitted state
+            setSubmitted({});
+            
+            // Clear answers state
+            setAnswers({});
+            
+            // Clear localStorage for both guests and logged-in users
+            localStorage.removeItem('learn-answers');
+            localStorage.removeItem('learn-submitted');
+            localStorage.removeItem('learn-answered-ids');
+            
+            if (status === 'authenticated') {
+                // Clear backend progress for logged-in users
+                fetch('/api/learn-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answeredIds: [] }),
+                })
+                .then(res => {
+                    console.log('Progress reset response status:', res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Progress reset response:', data);
+                    // Force a page reload to ensure clean state
+                    window.location.reload();
+                })
+                .catch(error => {
+                    console.error('Error resetting progress:', error);
+                    // Force a page reload even if there's an error
+                    window.location.reload();
+                });
+            } else {
+                // For guests, just reload the page to ensure clean state
+                window.location.reload();
+            }
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
             {/* Progress Bar */}
             <div className="mb-6">
                 <div className="flex justify-between items-center mb-1">
                     <span className="text-sm font-medium text-blue-700">Progress</span>
-                    <span className="text-xs text-gray-500">{totalAnswered} / {totalQuestions} answered</span>
+                    <div className="flex items-center space-x-4">
+                        <span className="text-xs text-gray-500">{totalAnswered} / {totalQuestions} answered</span>
+                        {totalAnswered > 0 && (
+                            <button
+                                onClick={handleResetProgress}
+                                className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                title="Reset all progress and start over"
+                            >
+                                Reset Progress
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-300">
                     <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
@@ -164,7 +302,9 @@ export default function Page() {
                     <div
                         key={q.id}
                         ref={el => questionRefs.current[index] = el}
-                        className="bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border border-gray-100 transition-shadow hover:shadow-2xl"
+                        className={`bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border border-gray-100 transition-shadow hover:shadow-2xl ${
+                            hasSubmitted ? 'bg-green-50 border-green-200' : ''
+                        }`}
                         tabIndex={0}
                         aria-labelledby={`question-title-${q.id}`}
                     >
@@ -172,6 +312,12 @@ export default function Page() {
                             <h2 id={`question-title-${q.id}`} className="text-xl font-bold text-gray-900">
                                 <span className="text-blue-600 font-extrabold mr-2">{(currentPage - 1) * ItemsPerPage + index + 1}.</span> {q.question_text}
                             </h2>
+                            {hasSubmitted && (
+                                <div className="flex items-center text-green-600 font-semibold">
+                                    <span className="text-2xl mr-2">✓</span>
+                                    <span>Completed</span>
+                                </div>
+                            )}
                         </div>
                         <div className="space-y-3">
                             {q.options && q.options.map((opt) => {
@@ -239,12 +385,9 @@ export default function Page() {
                                     Submit
                                 </button>
                             ) : (
-                                <div className="ml-2 text-base font-semibold animate-fade-in">
-                                    {isCorrect ? (
-                                        <span className="text-green-600">Correct!</span>
-                                    ) : (
-                                        <span className="text-red-600">Incorrect</span>
-                                    )}
+                                <div className="flex items-center text-green-600 font-semibold">
+                                    <span className="text-xl mr-2">✓</span>
+                                    <span>Question Completed</span>
                                 </div>
                             )}
                         </div>

@@ -1,6 +1,6 @@
 import "./globals.css";
 import AppLayout from "./components/AppLayout"; // adjust a path if needed
-import { SessionProvider } from "next-auth/react";
+import Providers from "./components/Providers";
 
 export const metadata = {
   title: "CEH",
@@ -14,11 +14,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <SessionProvider>
+        <Providers>
           <AppLayout>
             {children}
           </AppLayout>
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );
