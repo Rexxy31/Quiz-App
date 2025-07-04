@@ -308,16 +308,18 @@ export default function Page() {
                         tabIndex={0}
                         aria-labelledby={`question-title-${q.id}`}
                     >
+                        {hasSubmitted && (
+                            <div className="flex items-center justify-end mb-2">
+                                <div className="flex items-center text-green-600 font-semibold">
+                                    <span className="text-lg sm:text-xl md:text-2xl mr-2">✓</span>
+                                    <span className="text-xs sm:text-sm md:text-base">Completed</span>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex items-center justify-between mb-4">
-                            <h2 id={`question-title-${q.id}`} className="text-xl font-bold text-gray-900">
+                            <h2 id={`question-title-${q.id}`} className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
                                 <span className="text-blue-600 font-extrabold mr-2">{(currentPage - 1) * ItemsPerPage + index + 1}.</span> {q.question_text}
                             </h2>
-                            {hasSubmitted && (
-                                <div className="flex items-center text-green-600 font-semibold">
-                                    <span className="text-2xl mr-2">✓</span>
-                                    <span>Completed</span>
-                                </div>
-                            )}
                         </div>
                         <div className="space-y-3">
                             {q.options && q.options.map((opt) => {
@@ -361,7 +363,7 @@ export default function Page() {
                                             aria-checked={isSelected}
                                             aria-label={`Select option ${opt.option_letter}`}
                                         />
-                                        <span className="flex-grow text-base sm:text-lg font-medium">{opt.option_letter}. {opt.option_text}</span>
+                                        <span className="flex-grow text-xs sm:text-sm md:text-base lg:text-lg font-medium">{opt.option_letter}. {opt.option_text}</span>
                                         {/* Icons for feedback */}
                                         {hasSubmitted && (
                                             isCorrectOption && isSelected ? (
