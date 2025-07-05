@@ -139,7 +139,7 @@ export default function Page() {
             const reorderedQuestions = [...answeredQuestions, ...unansweredQuestions];
             setQuestions(reorderedQuestions);
         }
-    }, [submitted, loading]);
+    }, [submitted, loading, questions]);
 
     // Persist answers to localStorage whenever they change (only for guests)
     useEffect(() => {
@@ -607,7 +607,7 @@ export default function Page() {
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         <span>Question Completed</span>
                                     </div>
-                                    <p className="text-sm text-gray-600">Great job! You've learned this concept.</p>
+                                    <p className="text-sm text-gray-600">Great job! You&apos;ve learned this concept.</p>
                                 </div>
                             )}
                             

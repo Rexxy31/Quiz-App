@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Pagination from "@/app/components/Pagination";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { useSession } from 'next-auth/react';
@@ -99,7 +99,7 @@ export default function ExamPage() {
     if (timeLeft === 0 && !submitted) {
       handleExamSubmit();
     }
-  }, [timeLeft, submitted]);
+  }, [timeLeft, submitted, handleExamSubmit]);
 
   // Prevent navigation and copying during exam
   useEffect(() => {
@@ -200,7 +200,7 @@ export default function ExamPage() {
     });
   };
 
-  const handleExamSubmit = async () => {
+  const handleExamSubmit = useCallback(async () => {
     // Clear timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -232,7 +232,7 @@ export default function ExamPage() {
         body: JSON.stringify({ score, userId: session.user.id }),
       });
     }
-  };
+  }, [questions, answers, session, endExam]);
 
   // Check if all questions are answered
   const answeredCount = Object.keys(answers).length;
