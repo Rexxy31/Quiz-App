@@ -1,6 +1,6 @@
 import "./globals.css";
-import AppLayout from "./components/AppLayout";
-import Providers from "./components/Providers";
+import AppLayout from "./components/AppLayout.js";
+import Providers from "./components/Providers.js";
 
 export const metadata = {
   title: "CEH",
