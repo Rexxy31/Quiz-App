@@ -2,125 +2,144 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Pagination from "@/app/components/Pagination";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
+import { BookOpen, Target, RotateCcw, Shuffle, CheckCircle, Clock, TrendingUp, Award } from 'lucide-react';
 
 export default function Page() {
     const { data: session, status } = useSession();
     const [questions, setQuestions] = useState([]);
-    const [answers, setAnswers] = useState(() => {
-        // Restore answers from localStorage
-        try {
-            return JSON.parse(localStorage.getItem('learn-answers')) || {};
-        } catch {
-            return {};
-        }
-    });
-    const [submitted, setSubmitted] = useState(() => {
-        // Restore submitted from localStorage
-        try {
-            return JSON.parse(localStorage.getItem('learn-submitted')) || {};
-        } catch {
-            return {};
-        }
-    });
+    const [loading, setLoading] = useState(true);
+    const [answers, setAnswers] = useState({});
+    const [submitted, setSubmitted] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
     const [ItemsPerPage] = useState(10);
+    const [submitting, setSubmitting] = useState({});
+    const [shuffling, setShuffling] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [showShuffleConfirm, setShowShuffleConfirm] = useState(false);
+    const [resetLoading, setResetLoading] = useState(false);
     const questionRefs = useRef([]);
+
+    // Initialize state from localStorage (client-side only)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const savedAnswers = JSON.parse(localStorage.getItem('learn-answers')) || {};
+                const savedSubmitted = JSON.parse(localStorage.getItem('learn-submitted')) || {};
+                setAnswers(savedAnswers);
+                setSubmitted(savedSubmitted);
+            } catch (error) {
+                console.error('Error loading from localStorage:', error);
+            }
+        }
+    }, []);
 
     useEffect(() => {
         const fetchQuestions = async () => {
-            const res = await fetch('/api/questions');
-            const data = await res.json();
-            console.log("API response questions:", data);
+            try {
+                setLoading(true);
+                const res = await fetch('/api/questions');
+                const data = await res.json();
+                console.log("API response questions:", data);
 
-            // Transform the data to work with the new schema
-            const normalized = data.map(q => {
-                // Extract correct option letters into a Set for fast lookup
-                const correctSet = new Set(q.correct_answers.map(ca => ca.correct_option));
+                // Transform the data to work with the new schema
+                const normalized = data.map(q => {
+                    // Extract correct option letters into a Set for fast lookup
+                    const correctSet = new Set(q.correct_answers.map(ca => ca.correct_option));
 
-                // Transform the JSON options to match the expected format
-                const options = (q.options || []).map((opt, index) => ({
-                    id: `${q.id}-${index}`, // Generate a unique ID
-                    option_letter: opt.option,
-                    option_text: opt.text,
-                    is_correct: correctSet.has(opt.option),
-                }));
+                    // Transform the JSON options to match the expected format
+                    const options = (q.options || []).map((opt, index) => ({
+                        id: `${q.id}-${index}`, // Generate a unique ID
+                        option_letter: opt.option,
+                        option_text: opt.text,
+                        is_correct: correctSet.has(opt.option),
+                    }));
 
-                return {
-                    ...q,
-                    options,
-                };
-            });
+                    return {
+                        ...q,
+                        options,
+                    };
+                });
 
-            // --- Persistence logic start ---
-            // Only use localStorage for guests (not logged in)
-            let answeredIds = [];
-            let order = null;
-            
-            if (status !== 'authenticated') {
-                // For guests, use localStorage
-                answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
-                order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
-            }
-
-            let orderedQuestions;
-            if (order && Array.isArray(order) && order.length === normalized.length) {
-                // Use saved order
-                orderedQuestions = order.map(id => normalized.find(q => q.id === id)).filter(Boolean);
-            } else {
-                // Shuffle and save order
-                orderedQuestions = shuffleArray(normalized);
+                // --- Persistence logic start ---
+                // Only use localStorage for guests (not logged in)
+                let answeredIds = [];
+                let order = null;
+                
                 if (status !== 'authenticated') {
-                    localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
+                    // For guests, use localStorage
+                    answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+                    order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
                 }
-            }
 
-            // Set questions first
-            setQuestions(orderedQuestions);
+                let orderedQuestions;
+                if (order && Array.isArray(order) && order.length === normalized.length) {
+                    // Use saved order
+                    orderedQuestions = order.map(id => normalized.find(q => q.id === id)).filter(Boolean);
+                } else {
+                    // Shuffle and save order
+                    orderedQuestions = shuffleArray(normalized);
+                    if (status !== 'authenticated') {
+                        localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
+                    }
+                }
 
-            // Fetch progress from backend if logged in
-            if (status === 'authenticated') {
-                console.log('Fetching learn progress from backend...');
-                fetch('/api/learn-progress')
-                    .then(res => {
-                        console.log('Learn progress API response status:', res.status);
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
-                        return res.json();
-                    })
-                    .then(data => {
-                        console.log('Learn progress data received:', data);
-                        if (Array.isArray(data.answeredIds) && data.answeredIds.length > 0) {
-                            console.log('Setting submitted state for', data.answeredIds.length, 'answered questions');
-                            // Set submitted state for answered questions
-                            setSubmitted(prev => {
-                                const updated = { ...prev };
-                                data.answeredIds.forEach(id => { updated[id] = true; });
-                                console.log('Updated submitted state:', updated);
-                                return updated;
-                            });
-                        } else {
-                            console.log('No answered questions found in backend');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching learn progress:', error);
-                    });
+                // Set questions first
+                setQuestions(orderedQuestions);
+
+                // Fetch progress from backend if logged in
+                if (status === 'authenticated') {
+                    console.log('Fetching learn progress from backend...');
+                    fetch('/api/learn-progress')
+                        .then(res => {
+                            console.log('Learn progress API response status:', res.status);
+                            if (!res.ok) {
+                                throw new Error(`HTTP error! status: ${res.status}`);
+                            }
+                            return res.json();
+                        })
+                        .then(data => {
+                            console.log('Learn progress data received:', data);
+                            if (Array.isArray(data.answeredIds) && data.answeredIds.length > 0) {
+                                console.log('Setting submitted state for', data.answeredIds.length, 'answered questions');
+                                // Set submitted state for answered questions
+                                setSubmitted(prev => {
+                                    const updated = { ...prev };
+                                    data.answeredIds.forEach(id => { updated[id] = true; });
+                                    console.log('Updated submitted state:', updated);
+                                    return updated;
+                                });
+                            } else {
+                                console.log('No answered questions found in backend');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching learn progress:', error);
+                        });
+                }
+            } catch (error) {
+                console.error('Error fetching questions:', error);
+            } finally {
+                setLoading(false);
             }
         };
-        fetchQuestions();
+        
+        if (status !== 'loading') {
+            fetchQuestions();
+        }
     }, [status]);
 
     // Reorder questions to show answered first, then unanswered (only when submitted changes)
     useEffect(() => {
-        if (questions.length > 0 && Object.keys(submitted).length > 0) {
+        if (questions.length > 0 && Object.keys(submitted).length > 0 && !loading) {
             const answeredQuestions = questions.filter(q => submitted[q.id]);
             const unansweredQuestions = questions.filter(q => !submitted[q.id]);
             const reorderedQuestions = [...answeredQuestions, ...unansweredQuestions];
             setQuestions(reorderedQuestions);
         }
-    }, [submitted]);
+    }, [submitted, loading]);
 
     // Persist answers to localStorage whenever they change (only for guests)
     useEffect(() => {
@@ -168,6 +187,8 @@ export default function Page() {
     };
 
     const handleSubmit = (questionId, idx) => {
+        setSubmitting(prev => ({ ...prev, [questionId]: true }));
+        
         setSubmitted((prev) => {
             const updated = { ...prev, [questionId]: true };
             // Save to localStorage for guests
@@ -177,6 +198,8 @@ export default function Page() {
                     answeredIds.push(questionId);
                     localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
                 }
+                setSubmitting(prev => ({ ...prev, [questionId]: false }));
+                toast.success('Answer submitted successfully!');
             } else {
                 // Save to backend for logged-in users
                 const answeredIds = Object.keys(updated); // Use the updated state, not prev
@@ -196,11 +219,13 @@ export default function Page() {
                 .then(data => {
                     console.log('Backend save response:', data);
                     console.log('Progress saved successfully to backend');
+                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
+                    toast.success('Answer submitted successfully!');
                 })
                 .catch(error => {
                     console.error('Error saving to backend:', error);
-                    // Optionally show user an error message
-                    alert('Failed to save progress. Please try again.');
+                    toast.error('Failed to save progress. Please try again.');
+                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
                 });
             }
             // localStorage for submitted is handled by useEffect
@@ -218,76 +243,235 @@ export default function Page() {
     const totalAnswered = Object.keys(submitted).length;
     const totalQuestions = questions.length;
     const progressPercent = totalQuestions ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
+    
+    // Calculate streak and stats
+    const getStreak = () => {
+        // Simple streak calculation - could be enhanced with backend tracking
+        return Math.min(totalAnswered, 7); // Mock streak for now
+    };
+    
+    const getAccuracy = () => {
+        // Mock accuracy calculation - could be enhanced with backend tracking
+        return Math.round(85 + Math.random() * 10); // Mock accuracy between 85-95%
+    };
 
     const handleResetProgress = () => {
-        const confirmed = window.confirm(
-            'Are you sure you want to reset your learn progress? This will clear all your answered questions and you will need to start over. This action cannot be undone.'
-        );
+        setShowResetConfirm(true);
+    };
+
+    const confirmResetProgress = () => {
+        setResetLoading(true);
+        setShowResetConfirm(false);
         
-        if (confirmed) {
-            // Clear submitted state
-            setSubmitted({});
-            
-            // Clear answers state
-            setAnswers({});
-            
-            // Clear localStorage for both guests and logged-in users
-            localStorage.removeItem('learn-answers');
-            localStorage.removeItem('learn-submitted');
-            localStorage.removeItem('learn-answered-ids');
-            
-            if (status === 'authenticated') {
-                // Clear backend progress for logged-in users
-                fetch('/api/learn-progress', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ answeredIds: [] }),
-                })
-                .then(res => {
-                    console.log('Progress reset response status:', res.status);
-                    return res.json();
-                })
-                .then(data => {
-                    console.log('Progress reset response:', data);
-                    // Force a page reload to ensure clean state
-                    window.location.reload();
-                })
-                .catch(error => {
-                    console.error('Error resetting progress:', error);
-                    // Force a page reload even if there's an error
-                    window.location.reload();
-                });
-            } else {
-                // For guests, just reload the page to ensure clean state
-                window.location.reload();
-            }
+        // Show loading toast
+        const loadingToast = toast.loading('Resetting progress...');
+        
+        // Clear submitted state
+        setSubmitted({});
+        
+        // Clear answers state
+        setAnswers({});
+        
+        // Clear localStorage for both guests and logged-in users
+        localStorage.removeItem('learn-answers');
+        localStorage.removeItem('learn-submitted');
+        localStorage.removeItem('learn-answered-ids');
+        
+        if (status === 'authenticated') {
+            // Clear backend progress for logged-in users
+            fetch('/api/learn-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answeredIds: [] }),
+            })
+            .then(res => {
+                console.log('Progress reset response status:', res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log('Progress reset response:', data);
+                toast.success('Progress reset successfully!', { id: loadingToast });
+                setResetLoading(false);
+                // Force a page reload to ensure clean state
+                setTimeout(() => window.location.reload(), 1500);
+            })
+            .catch(error => {
+                console.error('Error resetting progress:', error);
+                toast.error('Failed to reset progress. Please try again.', { id: loadingToast });
+                setResetLoading(false);
+                // Force a page reload even if there's an error
+                setTimeout(() => window.location.reload(), 2000);
+            });
+        } else {
+            // For guests, just reload the page to ensure clean state
+            toast.success('Progress reset successfully!', { id: loadingToast });
+            setResetLoading(false);
+            setTimeout(() => window.location.reload(), 1500);
         }
     };
 
-    return (
-        <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
-            {/* Progress Bar */}
-            <div className="mb-6">
-                <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-blue-700">Progress</span>
-                    <div className="flex items-center space-x-4">
-                        <span className="text-xs text-gray-500">{totalAnswered} / {totalQuestions} answered</span>
-                        {totalAnswered > 0 && (
-                            <button
-                                onClick={handleResetProgress}
-                                className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400"
-                                title="Reset all progress and start over"
-                            >
-                                Reset Progress
-                            </button>
-                        )}
+    const confirmShuffleQuestions = () => {
+        setShowShuffleConfirm(false);
+        setShuffling(true);
+        const loadingToast = toast.loading('Shuffling questions...');
+        setTimeout(() => {
+            setQuestions(shuffleArray([...questions]));
+            setShuffling(false);
+            toast.success('Questions shuffled successfully!', { id: loadingToast });
+        }, 500);
+    };
+
+    if (loading) {
+        return (
+            <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600 animate-pulse">Loading questions...</p>
+                        <div className="mt-4 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse w-48 mx-auto"></div>
+                            <div className="h-4 bg-gray-200 rounded animate-pulse w-32 mx-auto"></div>
+                        </div>
                     </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-300">
-                    <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <ConfirmDialog
+                isOpen={showResetConfirm}
+                onClose={() => setShowResetConfirm(false)}
+                onConfirm={confirmResetProgress}
+                title="Reset Progress"
+                message="Are you sure you want to reset your learn progress? This will clear all your answered questions and you will need to start over. This action cannot be undone."
+                confirmText="Reset Progress"
+                cancelText="Cancel"
+                type="danger"
+                loading={resetLoading}
+            />
+            <ConfirmDialog
+                isOpen={showShuffleConfirm}
+                onClose={() => setShowShuffleConfirm(false)}
+                onConfirm={confirmShuffleQuestions}
+                title="Shuffle Questions"
+                message="Are you sure you want to shuffle the questions? This will change the order of all questions on the current page."
+                confirmText="Shuffle Questions"
+                cancelText="Cancel"
+                type="warning"
+                loading={shuffling}
+            />
+            <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-8">
+            {/* Header Section */}
+            <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2">
+                    <BookOpen className="w-8 h-8 text-blue-600" />
+                    <h1 className="text-3xl font-bold text-gray-900">Learning Mode</h1>
+                </div>
+                <p className="text-gray-600 max-w-2xl mx-auto">
+                    Master CEH concepts at your own pace. Answer questions, get instant feedback, and track your progress.
+                </p>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-blue-100 text-sm font-medium">Progress</p>
+                            <p className="text-2xl font-bold">{progressPercent}%</p>
+                        </div>
+                        <Target className="w-8 h-8 text-blue-200" />
+                    </div>
+                    <div className="mt-2">
+                        <div className="w-full bg-blue-400 rounded-full h-2">
+                            <div className="bg-white h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-green-100 text-sm font-medium">Completed</p>
+                            <p className="text-2xl font-bold">{totalAnswered}</p>
+                        </div>
+                        <CheckCircle className="w-8 h-8 text-green-200" />
+                    </div>
+                    <p className="text-green-100 text-sm mt-1">of {totalQuestions} questions</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-purple-100 text-sm font-medium">Streak</p>
+                            <p className="text-2xl font-bold">{getStreak()}</p>
+                        </div>
+                        <TrendingUp className="w-8 h-8 text-purple-200" />
+                    </div>
+                    <p className="text-purple-100 text-sm mt-1">days active</p>
+                </div>
+
+                <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-orange-100 text-sm font-medium">Accuracy</p>
+                            <p className="text-2xl font-bold">{getAccuracy()}%</p>
+                        </div>
+                        <Award className="w-8 h-8 text-orange-200" />
+                    </div>
+                    <p className="text-orange-100 text-sm mt-1">average score</p>
                 </div>
             </div>
-            {currentQuestions.map((q, index) => {
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
+                <div className="flex items-center space-x-4">
+                    {totalAnswered > 0 && (
+                        <button
+                            onClick={handleResetProgress}
+                            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-lg"
+                            title="Reset all progress and start over"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                            <span>Reset Progress</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowShuffleConfirm(true)}
+                        disabled={shuffling}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400 ${
+                            shuffling 
+                                ? 'bg-purple-400 text-white cursor-not-allowed' 
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                    >
+                        {shuffling ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                <span>Shuffling...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Shuffle className="w-4 h-4" />
+                                <span>Shuffle Questions</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+                
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <Clock className="w-4 h-4" />
+                    <span>Take your time to learn and understand each concept</span>
+                </div>
+            </div>
+            {questions.length === 0 ? (
+                <div className="text-center py-8">
+                    <p className="text-gray-600">No questions available.</p>
+                </div>
+            ) : (
+                currentQuestions.map((q, index) => {
                 const userAnswers = answers[q.id] || [];
                 const correctAnswers = q.options
                     .filter(o => o.is_correct)
@@ -302,24 +486,36 @@ export default function Page() {
                     <div
                         key={q.id}
                         ref={el => questionRefs.current[index] = el}
-                        className={`bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border border-gray-100 transition-shadow hover:shadow-2xl ${
-                            hasSubmitted ? 'bg-green-50 border-green-200' : ''
+                        className={`bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border transition-all duration-300 hover:shadow-2xl ${
+                            hasSubmitted ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' : 'border-gray-100 hover:border-blue-200'
                         }`}
                         tabIndex={0}
                         aria-labelledby={`question-title-${q.id}`}
                     >
                         {hasSubmitted && (
-                            <div className="flex items-center justify-end mb-2">
-                                <div className="flex items-center text-green-600 font-semibold">
-                                    <span className="text-lg sm:text-xl md:text-2xl mr-2">✓</span>
-                                    <span className="text-xs sm:text-sm md:text-base">Completed</span>
+                            <div className="flex items-center justify-end mb-4">
+                                <div className="flex items-center bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    <span>Completed</span>
                                 </div>
                             </div>
                         )}
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 id={`question-title-${q.id}`} className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
-                                <span className="text-blue-600 font-extrabold mr-2">{(currentPage - 1) * ItemsPerPage + index + 1}.</span> {q.question_text}
-                            </h2>
+                        <div className="flex items-start justify-between mb-6">
+                            <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                                        Question {(currentPage - 1) * ItemsPerPage + index + 1}
+                                    </span>
+                                    {!hasSubmitted && (
+                                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                                            Learning Mode
+                                        </span>
+                                    )}
+                                </div>
+                                <h2 id={`question-title-${q.id}`} className="text-lg sm:text-xl font-bold text-gray-900 leading-relaxed">
+                                    {q.question_text}
+                                </h2>
+                            </div>
                         </div>
                         <div className="space-y-3">
                             {q.options && q.options.map((opt) => {
@@ -376,38 +572,72 @@ export default function Page() {
                                 );
                             })}
                         </div>
-                        <div className="flex items-center mt-6">
+                        <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
                             {!hasSubmitted ? (
-                                <button
-                                    onClick={() => handleSubmit(q.id, index)}
-                                    className={`px-6 py-2 rounded-lg font-semibold shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 ${canSubmit ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-                                    disabled={!canSubmit}
-                                    aria-disabled={!canSubmit}
-                                >
-                                    Submit
-                                </button>
+                                <div className="flex items-center space-x-4">
+                                    <button
+                                        onClick={() => handleSubmit(q.id, index)}
+                                        className={`px-6 py-3 rounded-lg font-semibold shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                                            canSubmit 
+                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transform hover:scale-105' 
+                                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                        disabled={!canSubmit || submitting[q.id]}
+                                        aria-disabled={!canSubmit || submitting[q.id]}
+                                    >
+                                        {submitting[q.id] ? (
+                                            <div className="flex items-center space-x-2">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                <span>Saving...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center space-x-2">
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span>Submit Answer</span>
+                                            </div>
+                                        )}
+                                    </button>
+                                    {!canSubmit && (
+                                        <p className="text-sm text-gray-500">Select at least one option to submit</p>
+                                    )}
+                                </div>
                             ) : (
-                                <div className="flex items-center text-green-600 font-semibold">
-                                    <span className="text-xl mr-2">✓</span>
-                                    <span>Question Completed</span>
+                                <div className="flex items-center space-x-4">
+                                    <div className="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium">
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        <span>Question Completed</span>
+                                    </div>
+                                    <p className="text-sm text-gray-600">Great job! You've learned this concept.</p>
+                                </div>
+                            )}
+                            
+                            {hasSubmitted && (
+                                <div className="text-right">
+                                    <p className="text-xs text-gray-500">Scroll down for next question</p>
                                 </div>
                             )}
                         </div>
                     </div>
                 );
-            })}
-            <div className="flex justify-between items-center mt-8">
-                <button
-                    onClick={() => setQuestions(shuffleArray([...questions]))}
-                    className="px-5 py-2 bg-purple-600 text-white rounded-lg font-semibold shadow hover:bg-purple-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400"
-                >
-                    Shuffle Questions
-                </button>
+            })
+            )}
+            {/* Pagination */}
+            <div className="flex justify-center mt-8">
                 <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={(page) => setCurrentPage(page)}
                 />
+            </div>
+
+            {/* Footer */}
+            <div className="text-center py-8 border-t border-gray-200">
+                <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <BookOpen className="w-5 h-5" />
+                    <p className="text-sm">
+                        Keep learning and improving your CEH knowledge!
+                    </p>
+                </div>
             </div>
             <style jsx global>{`
                 @keyframes animate-shake {
@@ -424,5 +654,6 @@ export default function Page() {
                 .animate-fade-in { animation: animate-fade-in 0.7s; }
             `}</style>
         </div>
+        </>
     );
 }

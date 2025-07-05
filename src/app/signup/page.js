@@ -39,14 +39,23 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo and Header */}
         <div className="text-center">
-          <UserPlus className="w-12 h-12 mx-auto text-blue-600" />
-          <h1 className="mt-4 text-3xl font-extrabold text-center text-gray-900">
-            Create a new account
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg mb-6">
+            <UserPlus className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Join the community
           </h1>
+          <p className="text-gray-600">
+            Create your account and start your CEH certification journey
+          </p>
         </div>
+
+        {/* Signup Form */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label
@@ -117,6 +126,7 @@ export default function SignupPage() {
                  Log in
             </Link>
         </p>
+        </div>
       </div>
     </div>
   );

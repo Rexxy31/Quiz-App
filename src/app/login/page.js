@@ -38,59 +38,85 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        {/* Logo and Header */}
         <div className="text-center">
-            <Shield className="w-12 h-12 mx-auto text-blue-600" />
-            <h1 className="mt-4 text-3xl font-extrabold text-center text-gray-900">
-              Login to your account
-            </h1>
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg mb-6">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back
+          </h1>
+          <p className="text-gray-600">
+            Sign in to continue your CEH learning journey
+          </p>
         </div>
+
+        {/* Login Form */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label
               htmlFor="email"
-              className="text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-700 mb-2"
             >
               Email address
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="relative">
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                placeholder="Enter your email"
+              />
+            </div>
           </div>
           <div>
             <label
               htmlFor="password"
-              className="text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-700 mb-2"
             >
               Password
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-gray-50 focus:bg-white"
+                placeholder="Enter your password"
+              />
+            </div>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-sm text-red-600 font-medium">{error}</p>
+            </div>
+          )}
           <div>
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full px-4 py-2 text-lg font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="w-full px-4 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </div>
         </form>
@@ -100,6 +126,7 @@ export default function LoginPage() {
                  Sign up
             </Link>
         </p>
+        </div>
       </div>
     </div>
   );
