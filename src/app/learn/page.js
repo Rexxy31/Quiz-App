@@ -32,7 +32,20 @@ export default function Page() {
                 const savedCorrectAnswers = JSON.parse(localStorage.getItem('learn-correct-answers')) || {};
                 setAnswers(savedAnswers);
                 setSubmitted(savedSubmitted);
-                setCorrectAnswers(savedCorrectAnswers);
+                if (Array.isArray(savedCorrectAnswers)) {
+                    // Defensive: check if array contains only single letters (option letters)
+                    if (savedCorrectAnswers.every(x => typeof x === 'string' && x.length === 1 && /^[A-Z]$/i.test(x))) {
+                        // Ignore legacy/invalid array of option letters
+                        setCorrectAnswers({});
+                    } else {
+                        // Convert legacy array of IDs to object
+                        const obj = {};
+                        savedCorrectAnswers.forEach(id => { obj[id] = true; });
+                        setCorrectAnswers(obj);
+                    }
+                } else {
+                    setCorrectAnswers(savedCorrectAnswers);
+                }
             } catch (error) {
                 console.error('Error loading from localStorage:', error);
             }
@@ -110,6 +123,22 @@ export default function Page() {
                                     return updated;
                                 });
                             }
+                            if (Array.isArray(data.correctIds)) {
+                                console.log('correctIds from backend', data.correctIds); // Debug log
+                                setCorrectAnswers(prev => {
+                                    const updated = { ...prev };
+                                    data.correctIds.forEach(id => { updated[String(id)] = true; });
+                                    // Mark all other submitted as false if not in correctIds
+                                    if (Array.isArray(data.answeredIds)) {
+                                        data.answeredIds.forEach(id => {
+                                            if (!data.correctIds.includes(id)) {
+                                                updated[String(id)] = false;
+                                            }
+                                        });
+                                    }
+                                    return updated;
+                                });
+                            }
                         })
                         .catch(error => {
                             console.error('Error fetching learn progress:', error);
@@ -181,7 +210,11 @@ export default function Page() {
 
     // Persist correct answers to localStorage whenever they change (for both guests and logged-in users)
     useEffect(() => {
-        localStorage.setItem('learn-correct-answers', JSON.stringify(correctAnswers));
+        if (typeof correctAnswers === 'object' && !Array.isArray(correctAnswers)) {
+            localStorage.setItem('learn-correct-answers', JSON.stringify(correctAnswers));
+        } else {
+            localStorage.setItem('learn-correct-answers', JSON.stringify({}));
+        }
     }, [correctAnswers]);
 
 	function shuffleArray(array) {
@@ -227,9 +260,12 @@ export default function Page() {
         const correctAnswersForQuestion = question.options
             .filter(o => o.is_correct)
             .map(o => o.option_letter);
-        
-        const isCorrect = userAnswers.length === correctAnswersForQuestion.length &&
-            userAnswers.every(ans => correctAnswersForQuestion.includes(ans));
+        console.log('userAnswers:', userAnswers, 'correctAnswersForQuestion:', correctAnswersForQuestion); // Debug log
+        // Robust check: both arrays must have the same length and contain the same elements
+        const isCorrect =
+            userAnswers.length === correctAnswersForQuestion.length &&
+            userAnswers.every(ans => correctAnswersForQuestion.includes(ans)) &&
+            correctAnswersForQuestion.every(ans => userAnswers.includes(ans));
         
         // Update both states at once to prevent multiple re-renders
         setSubmitted(prev => ({ ...prev, [questionId]: true }));
@@ -249,11 +285,14 @@ export default function Page() {
             // For logged-in users, save to backend
             const currentSubmitted = { ...submitted, [questionId]: true };
             const answeredIds = Object.keys(currentSubmitted);
-            
+            const currentCorrectAnswers = { ...correctAnswers, [questionId]: isCorrect };
+            const correctIds = Object.keys(currentCorrectAnswers).filter(id => currentCorrectAnswers[id]);
+            console.log('correctIds sent to backend', correctIds); // Debug log
+            setCorrectAnswers(currentCorrectAnswers); // Update immediately for UI
             fetch('/api/learn-progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answeredIds }),
+                body: JSON.stringify({ answeredIds, correctIds }),
             })
             .then(res => {
                 if (!res.ok) {
@@ -262,8 +301,35 @@ export default function Page() {
                 return res.json();
             })
             .then(data => {
+                console.log('Learn-progress response:', data); // Debug log
                 setSubmitting(prev => ({ ...prev, [questionId]: false }));
                 toast.success('Answer submitted successfully!');
+                // Refetch progress to ensure state is in sync
+                fetch('/api/learn-progress')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (Array.isArray(data.answeredIds)) {
+                            setSubmitted(prev => {
+                                const updated = { ...prev };
+                                data.answeredIds.forEach(id => { updated[id] = true; });
+                                return updated;
+                            });
+                        }
+                        if (Array.isArray(data.correctIds)) {
+                            setCorrectAnswers(prev => {
+                                const updated = { ...prev };
+                                data.correctIds.forEach(id => { updated[String(id)] = true; });
+                                if (Array.isArray(data.answeredIds)) {
+                                    data.answeredIds.forEach(id => {
+                                        if (!data.correctIds.includes(id)) {
+                                            updated[String(id)] = false;
+                                        }
+                                    });
+                                }
+                                return updated;
+                            });
+                        }
+                    });
             })
             .catch(error => {
                 console.error('Error saving to backend:', error);
@@ -332,7 +398,7 @@ export default function Page() {
             fetch('/api/learn-progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answeredIds: [] }),
+                body: JSON.stringify({ answeredIds: [], correctIds: [] }),
             })
             .then(res => {
                 console.log('Progress reset response status:', res.status);
@@ -529,8 +595,13 @@ export default function Page() {
                     .filter(o => o.is_correct)
                     .map(o => o.option_letter);
                 console.log("Correct Answers:", correctAnswers);
-                const isCorrect = userAnswers.length === correctAnswers.length &&
-                    userAnswers.every(ans => correctAnswers.includes(ans));
+                const isCorrect = correctAnswers[String(q.id)] === true;
+                console.log('Render:', {
+                  qid: q.id,
+                  question: q.question_text,
+                  correctAnswers,
+                  isCorrect
+                });
                 const hasSubmitted = submitted[q.id];
                 const canSubmit = userAnswers.length > 0 && !hasSubmitted;
 
@@ -539,32 +610,15 @@ export default function Page() {
                         key={q.id}
                         ref={el => questionRefs.current[index] = el}
                         className={`bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border transition-all duration-300 hover:shadow-2xl ${
-                            hasSubmitted ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200' : 'border-gray-100 hover:border-blue-200'
+                            hasSubmitted
+                                ? isCorrect
+                                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+                                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+                                : 'border-gray-100 hover:border-blue-200'
                         }`}
                         tabIndex={0}
                         aria-labelledby={`question-title-${q.id}`}
                     >
-                        {hasSubmitted && (
-                            <div className="flex items-center justify-end mb-4">
-                                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                    correctAnswers[q.id] 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : 'bg-red-100 text-red-700'
-                                }`}>
-                                    {correctAnswers[q.id] ? (
-                                        <>
-                                            <CheckCircle className="w-4 h-4 mr-1" />
-                                            <span>Correct</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <X className="w-4 h-4 mr-1" />
-                                            <span>Incorrect</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                         <div className="flex items-start justify-between mb-6">
                             <div className="flex-1">
                                 <div className="flex items-center space-x-2 mb-2">
@@ -625,14 +679,6 @@ export default function Page() {
                                             aria-label={`Select option ${opt.option_letter}`}
                                         />
                                         <span className="flex-grow text-xs sm:text-sm md:text-base lg:text-lg font-medium">{opt.option_letter}. {opt.option_text}</span>
-                                        {/* Icons for feedback */}
-                                        {hasSubmitted && (
-                                            isCorrectOption && isSelected ? (
-                                                <span className="ml-3 flex items-center justify-center w-7 h-7 rounded-full bg-green-200 text-green-700 text-lg font-bold animate-bounce">✓</span>
-                                            ) : !isCorrectOption && isSelected ? (
-                                                <span className="ml-3 flex items-center justify-center w-7 h-7 rounded-full bg-red-200 text-red-700 text-lg font-bold animate-bounce">✗</span>
-                                            ) : null
-                                        )}
                                     </label>
                                 );
                             })}

@@ -20,11 +20,11 @@ export async function GET(req) {
 
   if (!user || !user.learnProgress) {
     console.log('GET /api/learn-progress - Returning empty array');
-    return new Response(JSON.stringify({ answeredIds: [] }), { status: 200 });
+    return new Response(JSON.stringify({ answeredIds: [], correctIds: [] }), { status: 200 });
   }
 
-  console.log('GET /api/learn-progress - Returning answeredIds:', user.learnProgress.answeredIds);
-  return new Response(JSON.stringify({ answeredIds: user.learnProgress.answeredIds }), { status: 200 });
+  console.log('GET /api/learn-progress - Returning answeredIds:', user.learnProgress.answeredIds, 'correctIds:', user.learnProgress.correctIds);
+  return new Response(JSON.stringify({ answeredIds: user.learnProgress.answeredIds, correctIds: user.learnProgress.correctIds || [] }), { status: 200 });
 }
 
 export async function POST(req) {
@@ -47,18 +47,18 @@ export async function POST(req) {
     return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
   }
 
-  const { answeredIds } = await req.json();
-  console.log('POST /api/learn-progress - Received answeredIds:', answeredIds);
+  const { answeredIds, correctIds } = await req.json();
+  console.log('POST /api/learn-progress - Received answeredIds:', answeredIds, 'correctIds:', correctIds);
   
-  if (!Array.isArray(answeredIds)) {
-    console.log('POST /api/learn-progress - Invalid answeredIds');
-    return new Response(JSON.stringify({ error: 'Invalid answeredIds' }), { status: 400 });
+  if (!Array.isArray(answeredIds) || (correctIds && !Array.isArray(correctIds))) {
+    console.log('POST /api/learn-progress - Invalid answeredIds or correctIds');
+    return new Response(JSON.stringify({ error: 'Invalid answeredIds or correctIds' }), { status: 400 });
   }
 
   const progress = await prisma.learnProgress.upsert({
     where: { userId: user.id },
-    update: { answeredIds },
-    create: { userId: user.id, answeredIds },
+    update: { answeredIds, correctIds: correctIds || [] },
+    create: { userId: user.id, answeredIds, correctIds: correctIds || [] },
   });
 
   console.log('POST /api/learn-progress - Progress saved:', progress);
