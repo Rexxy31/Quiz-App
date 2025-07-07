@@ -5,7 +5,7 @@ import Pagination from "@/app/components/Pagination";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import toast from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
-import { BookOpen, Target, RotateCcw, Shuffle, CheckCircle, Clock, TrendingUp, Award } from 'lucide-react';
+import { BookOpen, Target, RotateCcw, Shuffle, CheckCircle, Clock, TrendingUp, Award, X } from 'lucide-react';
 
 export default function Page() {
     const { data: session, status } = useSession();
@@ -13,6 +13,7 @@ export default function Page() {
     const [loading, setLoading] = useState(true);
     const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState({});
+    const [correctAnswers, setCorrectAnswers] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
     const [ItemsPerPage] = useState(10);
     const [submitting, setSubmitting] = useState({});
@@ -28,8 +29,10 @@ export default function Page() {
             try {
                 const savedAnswers = JSON.parse(localStorage.getItem('learn-answers')) || {};
                 const savedSubmitted = JSON.parse(localStorage.getItem('learn-submitted')) || {};
+                const savedCorrectAnswers = JSON.parse(localStorage.getItem('learn-correct-answers')) || {};
                 setAnswers(savedAnswers);
                 setSubmitted(savedSubmitted);
+                setCorrectAnswers(savedCorrectAnswers);
             } catch (error) {
                 console.error('Error loading from localStorage:', error);
             }
@@ -40,9 +43,9 @@ export default function Page() {
         const fetchQuestions = async () => {
             try {
                 setLoading(true);
+                
                 const res = await fetch('/api/questions');
                 const data = await res.json();
-                console.log("API response questions:", data);
 
                 // Transform the data to work with the new schema
                 const normalized = data.map(q => {
@@ -91,28 +94,21 @@ export default function Page() {
 
                 // Fetch progress from backend if logged in
                 if (status === 'authenticated') {
-                    console.log('Fetching learn progress from backend...');
                     fetch('/api/learn-progress')
                         .then(res => {
-                            console.log('Learn progress API response status:', res.status);
                             if (!res.ok) {
                                 throw new Error(`HTTP error! status: ${res.status}`);
                             }
                             return res.json();
                         })
                         .then(data => {
-                            console.log('Learn progress data received:', data);
                             if (Array.isArray(data.answeredIds) && data.answeredIds.length > 0) {
-                                console.log('Setting submitted state for', data.answeredIds.length, 'answered questions');
                                 // Set submitted state for answered questions
                                 setSubmitted(prev => {
                                     const updated = { ...prev };
                                     data.answeredIds.forEach(id => { updated[id] = true; });
-                                    console.log('Updated submitted state:', updated);
                                     return updated;
                                 });
-                            } else {
-                                console.log('No answered questions found in backend');
                             }
                         })
                         .catch(error => {
@@ -139,14 +135,42 @@ export default function Page() {
             const reorderedQuestions = [...answeredQuestions, ...unansweredQuestions];
             setQuestions(reorderedQuestions);
         }
-    }, [submitted, loading, questions]);
+    }, [submitted, loading]);
 
-    // Persist answers to localStorage whenever they change (only for guests)
+    // Calculate accuracy for existing answered questions on page load
     useEffect(() => {
-        if (status !== 'authenticated') {
-            localStorage.setItem('learn-answers', JSON.stringify(answers));
+        if (questions.length > 0 && Object.keys(submitted).length > 0 && Object.keys(answers).length > 0 && !loading) {
+            const existingCorrectAnswers = { ...correctAnswers };
+            let hasChanges = false;
+            
+            Object.keys(submitted).forEach(questionId => {
+                if (!(questionId in existingCorrectAnswers)) {
+                    const question = questions.find(q => q.id === questionId);
+                    if (question) {
+                        const userAnswers = answers[questionId] || [];
+                        const correctAnswersForQuestion = question.options
+                            .filter(o => o.is_correct)
+                            .map(o => o.option_letter);
+                        
+                        const isCorrect = userAnswers.length === correctAnswersForQuestion.length &&
+                            userAnswers.every(ans => correctAnswersForQuestion.includes(ans));
+                        
+                        existingCorrectAnswers[questionId] = isCorrect;
+                        hasChanges = true;
+                    }
+                }
+            });
+            
+            if (hasChanges) {
+                setCorrectAnswers(existingCorrectAnswers);
+            }
         }
-    }, [answers, status]);
+    }, [questions, submitted, answers, loading]);
+
+    // Persist answers to localStorage whenever they change (for both guests and logged-in users)
+    useEffect(() => {
+        localStorage.setItem('learn-answers', JSON.stringify(answers));
+    }, [answers]);
 
     // Persist submitted to localStorage whenever it changes (only for guests)
     useEffect(() => {
@@ -154,6 +178,11 @@ export default function Page() {
             localStorage.setItem('learn-submitted', JSON.stringify(submitted));
         }
     }, [submitted, status]);
+
+    // Persist correct answers to localStorage whenever they change (for both guests and logged-in users)
+    useEffect(() => {
+        localStorage.setItem('learn-correct-answers', JSON.stringify(correctAnswers));
+    }, [correctAnswers]);
 
 	function shuffleArray(array) {
 		return array
@@ -187,50 +216,62 @@ export default function Page() {
     };
 
     const handleSubmit = (questionId, idx) => {
+        // Prevent multiple submissions
+        if (submitting[questionId]) return;
+        
         setSubmitting(prev => ({ ...prev, [questionId]: true }));
         
-        setSubmitted((prev) => {
-            const updated = { ...prev, [questionId]: true };
-            // Save to localStorage for guests
-            if (status !== 'authenticated') {
-                const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
-                if (!answeredIds.includes(questionId)) {
-                    answeredIds.push(questionId);
-                    localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
+        // Calculate if the answer is correct
+        const userAnswers = answers[questionId] || [];
+        const question = questions.find(q => q.id === questionId);
+        const correctAnswersForQuestion = question.options
+            .filter(o => o.is_correct)
+            .map(o => o.option_letter);
+        
+        const isCorrect = userAnswers.length === correctAnswersForQuestion.length &&
+            userAnswers.every(ans => correctAnswersForQuestion.includes(ans));
+        
+        // Update both states at once to prevent multiple re-renders
+        setSubmitted(prev => ({ ...prev, [questionId]: true }));
+        setCorrectAnswers(prev => ({ ...prev, [questionId]: isCorrect }));
+        
+        // Handle saving based on authentication status
+        if (status !== 'authenticated') {
+            // For guests, save to localStorage
+            const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
+            if (!answeredIds.includes(questionId)) {
+                answeredIds.push(questionId);
+                localStorage.setItem('learn-answered-ids', JSON.stringify(answeredIds));
+            }
+            setSubmitting(prev => ({ ...prev, [questionId]: false }));
+            toast.success('Answer submitted successfully!');
+        } else {
+            // For logged-in users, save to backend
+            const currentSubmitted = { ...submitted, [questionId]: true };
+            const answeredIds = Object.keys(currentSubmitted);
+            
+            fetch('/api/learn-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answeredIds }),
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
                 }
+                return res.json();
+            })
+            .then(data => {
                 setSubmitting(prev => ({ ...prev, [questionId]: false }));
                 toast.success('Answer submitted successfully!');
-            } else {
-                // Save to backend for logged-in users
-                const answeredIds = Object.keys(updated); // Use the updated state, not prev
-                console.log('Saving to backend:', { questionId, answeredIds });
-                fetch('/api/learn-progress', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ answeredIds }),
-                })
-                .then(res => {
-                    console.log('Backend save response status:', res.status);
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    console.log('Backend save response:', data);
-                    console.log('Progress saved successfully to backend');
-                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
-                    toast.success('Answer submitted successfully!');
-                })
-                .catch(error => {
-                    console.error('Error saving to backend:', error);
-                    toast.error('Failed to save progress. Please try again.');
-                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
-                });
-            }
-            // localStorage for submitted is handled by useEffect
-            return updated;
-        });
+            })
+            .catch(error => {
+                console.error('Error saving to backend:', error);
+                toast.error('Failed to save progress. Please try again.');
+                setSubmitting(prev => ({ ...prev, [questionId]: false }));
+            });
+        }
+        
         // Scroll to next unanswered question
         setTimeout(() => {
             if (questionRefs.current[idx + 1]) {
@@ -251,8 +292,13 @@ export default function Page() {
     };
     
     const getAccuracy = () => {
-        // Mock accuracy calculation - could be enhanced with backend tracking
-        return Math.round(85 + Math.random() * 10); // Mock accuracy between 85-95%
+        // Real accuracy calculation based on correctly answered questions
+        const totalAnswered = Object.keys(submitted).length;
+        if (totalAnswered === 0) return 0;
+        
+        const totalCorrect = Object.values(correctAnswers).filter(isCorrect => isCorrect).length;
+        
+        return Math.round((totalCorrect / totalAnswered) * 100);
     };
 
     const handleResetProgress = () => {
@@ -272,10 +318,14 @@ export default function Page() {
         // Clear answers state
         setAnswers({});
         
+        // Clear correct answers state
+        setCorrectAnswers({});
+        
         // Clear localStorage for both guests and logged-in users
         localStorage.removeItem('learn-answers');
         localStorage.removeItem('learn-submitted');
         localStorage.removeItem('learn-answered-ids');
+        localStorage.removeItem('learn-correct-answers');
         
         if (status === 'authenticated') {
             // Clear backend progress for logged-in users
@@ -421,7 +471,9 @@ export default function Page() {
                         </div>
                         <Award className="w-8 h-8 text-orange-200" />
                     </div>
-                    <p className="text-orange-100 text-sm mt-1">average score</p>
+                    <p className="text-orange-100 text-sm mt-1">
+                        {Object.values(correctAnswers).filter(isCorrect => isCorrect).length} of {totalAnswered} correct
+                    </p>
                 </div>
             </div>
 
@@ -494,9 +546,22 @@ export default function Page() {
                     >
                         {hasSubmitted && (
                             <div className="flex items-center justify-end mb-4">
-                                <div className="flex items-center bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
-                                    <CheckCircle className="w-4 h-4 mr-1" />
-                                    <span>Completed</span>
+                                <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    correctAnswers[q.id] 
+                                        ? 'bg-green-100 text-green-700' 
+                                        : 'bg-red-100 text-red-700'
+                                }`}>
+                                    {correctAnswers[q.id] ? (
+                                        <>
+                                            <CheckCircle className="w-4 h-4 mr-1" />
+                                            <span>Correct</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <X className="w-4 h-4 mr-1" />
+                                            <span>Incorrect</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
