@@ -31,10 +31,44 @@ export default function ExamPage() {
   const [showExitMessage, setShowExitMessage] = useState(false);
   const [flaggedQuestions, setFlaggedQuestions] = useState(new Set());
   const [showQuestionNav, setShowQuestionNav] = useState(false);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
   const timerRef = useRef(null);
   const { startExam: startExamContext, endExam } = useExam();
+
+  // Move handleExamSubmit above useEffect
+  const handleExamSubmit = useCallback(async () => {
+    // Clear timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    let score = 0;
+    const answeredQuestions = questions.map(q => {
+      const userAnswers = answers[q.id] || [];
+      const correctAnswers = q.options.filter(o => o.is_correct).map(o => o.option_letter);
+      const isCorrect = userAnswers.length === correctAnswers.length &&
+        userAnswers.every(ans => correctAnswers.includes(ans));
+      if (isCorrect) {
+        score++;
+      }
+      return { ...q, isCorrect, userAnswers };
+    });
+
+    setResults({ score, total: questions.length, answeredQuestions });
+    setSubmitted(true);
+    endExam();
+    if(session) {
+      await fetch('/api/test-results', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ score, userId: session.user.id }),
+      });
+    }
+  }, [questions, answers, session, endExam]);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -44,7 +78,19 @@ export default function ExamPage() {
 
   useEffect(() => {
     const fetchQuestions = async () => {
-      const res = await fetch('/api/questions');
+      setLoadingQuestions(true);
+      let answeredIds = [];
+      try {
+        const progressRes = await fetch('/api/learn-progress');
+        if (progressRes.ok) {
+          const progress = await progressRes.json();
+          answeredIds = Array.isArray(progress.answeredIds) ? progress.answeredIds : [];
+        }
+      } catch (e) {
+        // Ignore, fallback to empty
+      }
+      const excludeParam = answeredIds.length > 0 ? `?excludeIds=${answeredIds.join(',')}` : '';
+      const res = await fetch(`/api/questions${excludeParam}`);
       const data = await res.json();
 
       // Transform the data to work with the new schema
@@ -65,6 +111,7 @@ export default function ExamPage() {
 
       const shuffled = shuffleArray(normalized).slice(0, 120); // Increased to 120 questions
       setQuestions(shuffled);
+      setLoadingQuestions(false);
     };
 
     if (status === 'authenticated') {
@@ -199,40 +246,6 @@ export default function ExamPage() {
       }
     });
   };
-
-  const handleExamSubmit = useCallback(async () => {
-    // Clear timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    let score = 0;
-    const answeredQuestions = questions.map(q => {
-      const userAnswers = answers[q.id] || [];
-      const correctAnswers = q.options.filter(o => o.is_correct).map(o => o.option_letter);
-      const isCorrect = userAnswers.length === correctAnswers.length &&
-        userAnswers.every(ans => correctAnswers.includes(ans));
-      
-      if (isCorrect) {
-        score++;
-      }
-      return { ...q, isCorrect, userAnswers };
-    });
-
-    setResults({ score, total: questions.length, answeredQuestions });
-    setSubmitted(true);
-    endExam();
-    
-    if(session) {
-      await fetch('/api/test-results', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ score, userId: session.user.id }),
-      });
-    }
-  }, [questions, answers, session, endExam]);
 
   // Check if all questions are answered
   const answeredCount = Object.keys(answers).length;
@@ -385,25 +398,18 @@ export default function ExamPage() {
               <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm mt-0.5">1</div>
               <div>
                 <p className="font-semibold">Exam Duration: 120 minutes</p>
-                <p className="text-sm text-gray-600">You will have exactly 2 hours to complete all 120 questions.</p>
+                <p className="text-sm text-gray-600">You will have exactly 2 hours to answer all 120 questions.</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm mt-0.5">2</div>
-              <div>
-                <p className="font-semibold">Question Format: Multiple Choice</p>
-                <p className="text-sm text-gray-600">Some questions may have multiple correct answers. Select all that apply.</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm mt-0.5">3</div>
               <div>
                 <p className="font-semibold">Auto-Submission</p>
                 <p className="text-sm text-gray-600">The exam will automatically submit when time expires.</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm mt-0.5">4</div>
+              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm mt-0.5">3</div>
               <div>
                 <p className="font-semibold">Navigation</p>
                 <p className="text-sm text-gray-600">Use the pagination to navigate between questions. You can review and change answers.</p>

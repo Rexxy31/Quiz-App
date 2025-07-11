@@ -21,6 +21,8 @@ export default function Page() {
     const [showResetConfirm, setShowResetConfirm] = useState(false);
     const [showShuffleConfirm, setShowShuffleConfirm] = useState(false);
     const [resetLoading, setResetLoading] = useState(false);
+    const [currentStreak, setCurrentStreak] = useState(0);
+    const [longestStreak, setLongestStreak] = useState(0);
     const questionRefs = useRef([]);
 
     // Initialize state from localStorage (client-side only)
@@ -84,7 +86,7 @@ export default function Page() {
                 let answeredIds = [];
                 let order = null;
                 
-                if (status !== 'authenticated') {
+                if (status !== 'authenticated' && typeof window !== 'undefined') {
                     // For guests, use localStorage
                     answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
                     order = JSON.parse(localStorage.getItem('learn-question-order') || 'null');
@@ -97,7 +99,7 @@ export default function Page() {
                 } else {
                     // Shuffle and save order
                     orderedQuestions = shuffleArray(normalized);
-                    if (status !== 'authenticated') {
+                    if (status !== 'authenticated' && typeof window !== 'undefined') {
                         localStorage.setItem('learn-question-order', JSON.stringify(orderedQuestions.map(q => q.id)));
                     }
                 }
@@ -138,6 +140,13 @@ export default function Page() {
                                     }
                                     return updated;
                                 });
+                            }
+                            // Set streak data
+                            if (data.currentStreak !== undefined) {
+                                setCurrentStreak(data.currentStreak);
+                            }
+                            if (data.longestStreak !== undefined) {
+                                setLongestStreak(data.longestStreak);
                             }
                         })
                         .catch(error => {
@@ -198,22 +207,26 @@ export default function Page() {
 
     // Persist answers to localStorage whenever they change (for both guests and logged-in users)
     useEffect(() => {
-        localStorage.setItem('learn-answers', JSON.stringify(answers));
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('learn-answers', JSON.stringify(answers));
+        }
     }, [answers]);
 
     // Persist submitted to localStorage whenever it changes (only for guests)
     useEffect(() => {
-        if (status !== 'authenticated') {
+        if (typeof window !== 'undefined' && status !== 'authenticated') {
             localStorage.setItem('learn-submitted', JSON.stringify(submitted));
         }
     }, [submitted, status]);
 
     // Persist correct answers to localStorage whenever they change (for both guests and logged-in users)
     useEffect(() => {
-        if (typeof correctAnswers === 'object' && !Array.isArray(correctAnswers)) {
-            localStorage.setItem('learn-correct-answers', JSON.stringify(correctAnswers));
-        } else {
-            localStorage.setItem('learn-correct-answers', JSON.stringify({}));
+        if (typeof window !== 'undefined') {
+            if (typeof correctAnswers === 'object' && !Array.isArray(correctAnswers)) {
+                localStorage.setItem('learn-correct-answers', JSON.stringify(correctAnswers));
+            } else {
+                localStorage.setItem('learn-correct-answers', JSON.stringify({}));
+            }
         }
     }, [correctAnswers]);
 
@@ -232,19 +245,11 @@ export default function Page() {
 
     const handleAnswer = (questionId, optionLetter) => {
         setAnswers((prev) => {
-            const currentAnswers = prev[questionId] || [];
-
-            if (currentAnswers.includes(optionLetter)) {
-                return {
-                    ...prev,
-                    [questionId]: currentAnswers.filter((a) => a !== optionLetter),
-                };
-            } else {
-                return {
-                    ...prev,
-                    [questionId]: [...currentAnswers, optionLetter],
-                };
-            }
+            // For radio buttons, replace the current selection
+            return {
+                ...prev,
+                [questionId]: [optionLetter],
+            };
         });
     };
 
@@ -272,7 +277,7 @@ export default function Page() {
         setCorrectAnswers(prev => ({ ...prev, [questionId]: isCorrect }));
         
         // Handle saving based on authentication status
-        if (status !== 'authenticated') {
+        if (status !== 'authenticated' && typeof window !== 'undefined') {
             // For guests, save to localStorage
             const answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
             if (!answeredIds.includes(questionId)) {
@@ -304,6 +309,15 @@ export default function Page() {
                 console.log('Learn-progress response:', data); // Debug log
                 setSubmitting(prev => ({ ...prev, [questionId]: false }));
                 toast.success('Answer submitted successfully!');
+                
+                // Update streak data from response
+                if (data.currentStreak !== undefined) {
+                    setCurrentStreak(data.currentStreak);
+                }
+                if (data.longestStreak !== undefined) {
+                    setLongestStreak(data.longestStreak);
+                }
+                
                 // Refetch progress to ensure state is in sync
                 fetch('/api/learn-progress')
                     .then(res => res.json())
@@ -329,6 +343,13 @@ export default function Page() {
                                 return updated;
                             });
                         }
+                        // Update streak data from refetch
+                        if (data.currentStreak !== undefined) {
+                            setCurrentStreak(data.currentStreak);
+                        }
+                        if (data.longestStreak !== undefined) {
+                            setLongestStreak(data.longestStreak);
+                        }
                     });
             })
             .catch(error => {
@@ -353,8 +374,12 @@ export default function Page() {
     
     // Calculate streak and stats
     const getStreak = () => {
-        // Simple streak calculation - could be enhanced with backend tracking
-        return Math.min(totalAnswered, 7); // Mock streak for now
+        // Use real streak data from backend for authenticated users
+        if (status === 'authenticated') {
+            return currentStreak;
+        }
+        // For guests, use a simple calculation based on answered questions
+        return Math.min(totalAnswered, 7);
     };
     
     const getAccuracy = () => {
@@ -388,10 +413,12 @@ export default function Page() {
         setCorrectAnswers({});
         
         // Clear localStorage for both guests and logged-in users
-        localStorage.removeItem('learn-answers');
-        localStorage.removeItem('learn-submitted');
-        localStorage.removeItem('learn-answered-ids');
-        localStorage.removeItem('learn-correct-answers');
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('learn-answers');
+            localStorage.removeItem('learn-submitted');
+            localStorage.removeItem('learn-answered-ids');
+            localStorage.removeItem('learn-correct-answers');
+        }
         
         if (status === 'authenticated') {
             // Clear backend progress for logged-in users
@@ -526,7 +553,12 @@ export default function Page() {
                         </div>
                         <TrendingUp className="w-8 h-8 text-purple-200" />
                     </div>
-                    <p className="text-purple-100 text-sm mt-1">days active</p>
+                    <p className="text-purple-100 text-sm mt-1">
+                        {status === 'authenticated' && longestStreak > 0 
+                            ? `Best: ${longestStreak} days` 
+                            : 'days active'
+                        }
+                    </p>
                 </div>
 
                 <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-4 shadow-lg">
@@ -591,18 +623,24 @@ export default function Page() {
             ) : (
                 currentQuestions.map((q, index) => {
                 const userAnswers = answers[q.id] || [];
-                const correctAnswers = q.options
+                const correctAnswerOptions = q.options
                     .filter(o => o.is_correct)
                     .map(o => o.option_letter);
-                console.log("Correct Answers:", correctAnswers);
-                const isCorrect = correctAnswers[String(q.id)] === true;
+                const hasSubmitted = submitted[q.id];
+                console.log("Correct Answer Options:", correctAnswerOptions);
+                
+                // Check if the user's answer is correct - use the stored value from state
+                const isCorrect = hasSubmitted ? correctAnswers[q.id] === true : false;
+                
                 console.log('Render:', {
                   qid: q.id,
                   question: q.question_text,
-                  correctAnswers,
-                  isCorrect
+                  correctAnswerOptions,
+                  userAnswers,
+                  isCorrect,
+                  hasSubmitted,
+                  correctAnswersValue: correctAnswers[q.id]
                 });
-                const hasSubmitted = submitted[q.id];
                 const canSubmit = userAnswers.length > 0 && !hasSubmitted;
 
                 return (
@@ -630,6 +668,7 @@ export default function Page() {
                                             Learning Mode
                                         </span>
                                     )}
+
                                 </div>
                                 <h2 id={`question-title-${q.id}`} className="text-lg sm:text-xl font-bold text-gray-900 leading-relaxed">
                                     {q.question_text}
@@ -668,13 +707,13 @@ export default function Page() {
                                         aria-label={`Option ${opt.option_letter}: ${opt.option_text}`}
                                     >
                                         <input
-                                            type="checkbox"
+                                            type="radio"
                                             disabled={hasSubmitted}
                                             name={`question-${q.id}`}
                                             value={opt.option_letter}
                                             checked={isSelected}
                                             onChange={() => handleAnswer(q.id, opt.option_letter)}
-                                            className="mr-4 w-5 h-5 accent-blue-600 rounded focus:ring-2 focus:ring-blue-400"
+                                            className="mr-4 w-5 h-5 accent-blue-600 rounded-full focus:ring-2 focus:ring-blue-400"
                                             aria-checked={isSelected}
                                             aria-label={`Select option ${opt.option_letter}`}
                                         />
@@ -708,9 +747,7 @@ export default function Page() {
                                             </div>
                                         )}
                                     </button>
-                                    {!canSubmit && (
-                                        <p className="text-sm text-gray-500">Select at least one option to submit</p>
-                                    )}
+
                                 </div>
                             ) : (
                                 <div className="flex items-center space-x-4">

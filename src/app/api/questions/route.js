@@ -19,8 +19,17 @@ export async function GET(request) {
     if (!prisma) {
       throw new Error('Prisma client not initialized');
     }
-    
+
+    // Parse excludeIds from query string
+    const { searchParams } = new URL(request.url);
+    const excludeIdsParam = searchParams.get('excludeIds');
+    let excludeIds = [];
+    if (excludeIdsParam) {
+      excludeIds = excludeIdsParam.split(',').map(id => id.trim()).filter(Boolean);
+    }
+
     const questions = await prisma.question.findMany({
+      where: excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {},
       include: {
         correct_answers: true,
       },

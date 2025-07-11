@@ -96,5 +96,9 @@ model LearnProgress {
   answeredIds Json
   correctIds  Json     @default("[]")
   updatedAt   DateTime @updatedAt
+  // Streak tracking fields
+  lastActivityDate DateTime?
+  currentStreak    Int     @default(0)
+  longestStreak    Int     @default(0)
   user        User     @relation(fields: [userId], references: [id])
 }
