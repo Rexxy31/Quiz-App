@@ -55,8 +55,8 @@ export default function LeaderboardsPage() {
 				<div className="text-center">
 					<div className="bg-red-50 border border-red-200 rounded-lg p-6">
 						<p className="text-red-600 font-medium">Error: {error}</p>
-						<button 
-							onClick={() => window.location.reload()} 
+						<button
+							onClick={() => window.location.reload()}
 							className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
 						>
 							Try Again
@@ -68,40 +68,44 @@ export default function LeaderboardsPage() {
 	}
 
 	return (
-		<div className="max-w-4xl mx-auto p-4 sm:p-6">
-			<div className="text-center mb-12">
-				<div className="relative inline-block">
-					<Trophy className="w-20 h-20 mx-auto text-yellow-500 drop-shadow-lg animate-bounce" />
-					<div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-						🔥
+		<div className="max-w-5xl mx-auto p-4 sm:p-8 pt-24 pb-20">
+			<div className="text-center mb-20 relative">
+				<div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-yellow-400/20 blur-[100px] -z-10" />
+				<div className="relative inline-block mb-8">
+					<div className="p-6 bg-white rounded-[2.5rem] shadow-2xl glass-morphism animate-bounce-slow">
+						<Trophy className="w-24 h-24 mx-auto text-yellow-500 drop-shadow-2xl" />
+					</div>
+					<div className="absolute -top-4 -right-4 px-4 py-2 bg-rose-600 rounded-2xl shadow-xl flex items-center justify-center text-white text-sm font-black tracking-widest border-4 border-white">
+						STREAK
 					</div>
 				</div>
-				<h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mt-6 mb-4 bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
-					Top Performers
+				<h1 className="text-5xl md:text-7xl font-black text-slate-900 mb-6 tracking-tight">
+					Path to <span className="premium-text-gradient">Mastery</span>
 				</h1>
-				<p className="text-lg text-gray-600 max-w-2xl mx-auto">
-					See who is leading the pack in the CEH practice tests. Compete with the best and track your progress!
+				<p className="text-xl text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed">
+					Celebrate the elite performers of the CEH community. Track your ascent and aim for the summit.
 				</p>
 			</div>
 
-			<div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-				<div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4">
-					<h2 className="text-xl font-bold text-white">Leaderboard</h2>
+			<div className="space-y-6">
+				<div className="flex items-center justify-between mb-8 px-4">
+					<h2 className="text-2xl font-black text-slate-900 uppercase tracking-widest">Global Rankings</h2>
+					<div className="text-sm font-bold text-slate-400">{leaderboard.length} COMPETITORS</div>
 				</div>
-				
+
 				{leaderboard.length > 0 ? (
 					<div className="divide-y divide-gray-100">
 						{leaderboard.map((entry, index) => {
 							const getRankBadge = (rank) => {
-								if (rank === 0) return { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-600', text: '🥇', label: '1st' };
-								if (rank === 1) return { bg: 'bg-gradient-to-r from-gray-300 to-gray-400', text: '🥈', label: '2nd' };
-								if (rank === 2) return { bg: 'bg-gradient-to-r from-orange-400 to-orange-600', text: '🥉', label: '3rd' };
+								if (rank === 0) return { bg: 'bg-gradient-to-r from-yellow-400 to-yellow-600', text: '1', label: '1st' };
+								if (rank === 1) return { bg: 'bg-gradient-to-r from-gray-300 to-gray-400', text: '2', label: '2nd' };
+								if (rank === 2) return { bg: 'bg-gradient-to-r from-orange-400 to-orange-600', text: '3', label: '3rd' };
 								return { bg: 'bg-gray-100', text: `${rank + 1}`, label: `${rank + 1}th` };
 							};
-							
+
 							const rankBadge = getRankBadge(index);
 							const percentage = Math.round((entry.score / 50) * 100);
-							
+
 							return (
 								<div key={entry.id} className="p-6 hover:bg-gray-50 transition-colors duration-200">
 									<div className="flex items-center space-x-4">
@@ -127,7 +131,7 @@ export default function LeaderboardsPage() {
 											</div>
 											<div className="mt-2">
 												<div className="w-full bg-gray-200 rounded-full h-2">
-													<div 
+													<div
 														className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-500"
 														style={{ width: `${percentage}%` }}
 													></div>
@@ -154,8 +158,8 @@ export default function LeaderboardsPage() {
 						</div>
 						<h3 className="text-xl font-semibold text-gray-900 mb-2">No scores recorded yet</h3>
 						<p className="text-gray-500 mb-6">Be the first to take a test and claim the top spot!</p>
-						<a 
-							href="/test" 
+						<a
+							href="/test"
 							className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200"
 						>
 							Take Your First Test

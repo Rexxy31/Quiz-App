@@ -58,7 +58,7 @@ export default function Page() {
         const fetchQuestions = async () => {
             try {
                 setLoading(true);
-                
+
                 const res = await fetch('/api/questions');
                 const data = await res.json();
 
@@ -85,7 +85,7 @@ export default function Page() {
                 // Only use localStorage for guests (not logged in)
                 let answeredIds = [];
                 let order = null;
-                
+
                 if (status !== 'authenticated' && typeof window !== 'undefined') {
                     // For guests, use localStorage
                     answeredIds = JSON.parse(localStorage.getItem('learn-answered-ids') || '[]');
@@ -159,7 +159,7 @@ export default function Page() {
                 setLoading(false);
             }
         };
-        
+
         if (status !== 'loading') {
             fetchQuestions();
         }
@@ -180,7 +180,7 @@ export default function Page() {
         if (questions.length > 0 && Object.keys(submitted).length > 0 && Object.keys(answers).length > 0 && !loading) {
             const existingCorrectAnswers = { ...correctAnswers };
             let hasChanges = false;
-            
+
             Object.keys(submitted).forEach(questionId => {
                 if (!(questionId in existingCorrectAnswers)) {
                     const question = questions.find(q => q.id === questionId);
@@ -189,16 +189,16 @@ export default function Page() {
                         const correctAnswersForQuestion = question.options
                             .filter(o => o.is_correct)
                             .map(o => o.option_letter);
-                        
+
                         const isCorrect = userAnswers.length === correctAnswersForQuestion.length &&
                             userAnswers.every(ans => correctAnswersForQuestion.includes(ans));
-                        
+
                         existingCorrectAnswers[questionId] = isCorrect;
                         hasChanges = true;
                     }
                 }
             });
-            
+
             if (hasChanges) {
                 setCorrectAnswers(existingCorrectAnswers);
             }
@@ -230,12 +230,12 @@ export default function Page() {
         }
     }, [correctAnswers]);
 
-	function shuffleArray(array) {
-		return array
-			.map(value => ({value, sort: Math.random()}))
-			.sort((a, b) => a.sort - b.sort)
-			.map(({value}) => value);
-	}
+    function shuffleArray(array) {
+        return array
+            .map(value => ({ value, sort: Math.random() }))
+            .sort((a, b) => a.sort - b.sort)
+            .map(({ value }) => value);
+    }
 
     const indexOfLastQuestion = currentPage * ItemsPerPage;
     const indexOfFirstQuestion = indexOfLastQuestion - ItemsPerPage;
@@ -256,9 +256,9 @@ export default function Page() {
     const handleSubmit = (questionId, idx) => {
         // Prevent multiple submissions
         if (submitting[questionId]) return;
-        
+
         setSubmitting(prev => ({ ...prev, [questionId]: true }));
-        
+
         // Calculate if the answer is correct
         const userAnswers = answers[questionId] || [];
         const question = questions.find(q => q.id === questionId);
@@ -271,11 +271,11 @@ export default function Page() {
             userAnswers.length === correctAnswersForQuestion.length &&
             userAnswers.every(ans => correctAnswersForQuestion.includes(ans)) &&
             correctAnswersForQuestion.every(ans => userAnswers.includes(ans));
-        
+
         // Update both states at once to prevent multiple re-renders
         setSubmitted(prev => ({ ...prev, [questionId]: true }));
         setCorrectAnswers(prev => ({ ...prev, [questionId]: isCorrect }));
-        
+
         // Handle saving based on authentication status
         if (status !== 'authenticated' && typeof window !== 'undefined') {
             // For guests, save to localStorage
@@ -299,66 +299,66 @@ export default function Page() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answeredIds, correctIds }),
             })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(data => {
-                console.log('Learn-progress response:', data); // Debug log
-                setSubmitting(prev => ({ ...prev, [questionId]: false }));
-                toast.success('Answer submitted successfully!');
-                
-                // Update streak data from response
-                if (data.currentStreak !== undefined) {
-                    setCurrentStreak(data.currentStreak);
-                }
-                if (data.longestStreak !== undefined) {
-                    setLongestStreak(data.longestStreak);
-                }
-                
-                // Refetch progress to ensure state is in sync
-                fetch('/api/learn-progress')
-                    .then(res => res.json())
-                    .then(data => {
-                        if (Array.isArray(data.answeredIds)) {
-                            setSubmitted(prev => {
-                                const updated = { ...prev };
-                                data.answeredIds.forEach(id => { updated[id] = true; });
-                                return updated;
-                            });
-                        }
-                        if (Array.isArray(data.correctIds)) {
-                            setCorrectAnswers(prev => {
-                                const updated = { ...prev };
-                                data.correctIds.forEach(id => { updated[String(id)] = true; });
-                                if (Array.isArray(data.answeredIds)) {
-                                    data.answeredIds.forEach(id => {
-                                        if (!data.correctIds.includes(id)) {
-                                            updated[String(id)] = false;
-                                        }
-                                    });
-                                }
-                                return updated;
-                            });
-                        }
-                        // Update streak data from refetch
-                        if (data.currentStreak !== undefined) {
-                            setCurrentStreak(data.currentStreak);
-                        }
-                        if (data.longestStreak !== undefined) {
-                            setLongestStreak(data.longestStreak);
-                        }
-                    });
-            })
-            .catch(error => {
-                console.error('Error saving to backend:', error);
-                toast.error('Failed to save progress. Please try again.');
-                setSubmitting(prev => ({ ...prev, [questionId]: false }));
-            });
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Learn-progress response:', data); // Debug log
+                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
+                    toast.success('Answer submitted successfully!');
+
+                    // Update streak data from response
+                    if (data.currentStreak !== undefined) {
+                        setCurrentStreak(data.currentStreak);
+                    }
+                    if (data.longestStreak !== undefined) {
+                        setLongestStreak(data.longestStreak);
+                    }
+
+                    // Refetch progress to ensure state is in sync
+                    fetch('/api/learn-progress')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (Array.isArray(data.answeredIds)) {
+                                setSubmitted(prev => {
+                                    const updated = { ...prev };
+                                    data.answeredIds.forEach(id => { updated[id] = true; });
+                                    return updated;
+                                });
+                            }
+                            if (Array.isArray(data.correctIds)) {
+                                setCorrectAnswers(prev => {
+                                    const updated = { ...prev };
+                                    data.correctIds.forEach(id => { updated[String(id)] = true; });
+                                    if (Array.isArray(data.answeredIds)) {
+                                        data.answeredIds.forEach(id => {
+                                            if (!data.correctIds.includes(id)) {
+                                                updated[String(id)] = false;
+                                            }
+                                        });
+                                    }
+                                    return updated;
+                                });
+                            }
+                            // Update streak data from refetch
+                            if (data.currentStreak !== undefined) {
+                                setCurrentStreak(data.currentStreak);
+                            }
+                            if (data.longestStreak !== undefined) {
+                                setLongestStreak(data.longestStreak);
+                            }
+                        });
+                })
+                .catch(error => {
+                    console.error('Error saving to backend:', error);
+                    toast.error('Failed to save progress. Please try again.');
+                    setSubmitting(prev => ({ ...prev, [questionId]: false }));
+                });
         }
-        
+
         // Scroll to next unanswered question
         setTimeout(() => {
             if (questionRefs.current[idx + 1]) {
@@ -371,7 +371,7 @@ export default function Page() {
     const totalAnswered = Object.keys(submitted).length;
     const totalQuestions = questions.length;
     const progressPercent = totalQuestions ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
-    
+
     // Calculate streak and stats
     const getStreak = () => {
         // Use real streak data from backend for authenticated users
@@ -381,14 +381,14 @@ export default function Page() {
         // For guests, use a simple calculation based on answered questions
         return Math.min(totalAnswered, 7);
     };
-    
+
     const getAccuracy = () => {
         // Real accuracy calculation based on correctly answered questions
         const totalAnswered = Object.keys(submitted).length;
         if (totalAnswered === 0) return 0;
-        
+
         const totalCorrect = Object.values(correctAnswers).filter(isCorrect => isCorrect).length;
-        
+
         return Math.round((totalCorrect / totalAnswered) * 100);
     };
 
@@ -399,19 +399,19 @@ export default function Page() {
     const confirmResetProgress = () => {
         setResetLoading(true);
         setShowResetConfirm(false);
-        
+
         // Show loading toast
         const loadingToast = toast.loading('Resetting progress...');
-        
+
         // Clear submitted state
         setSubmitted({});
-        
+
         // Clear answers state
         setAnswers({});
-        
+
         // Clear correct answers state
         setCorrectAnswers({});
-        
+
         // Clear localStorage for both guests and logged-in users
         if (typeof window !== 'undefined') {
             localStorage.removeItem('learn-answers');
@@ -419,7 +419,7 @@ export default function Page() {
             localStorage.removeItem('learn-answered-ids');
             localStorage.removeItem('learn-correct-answers');
         }
-        
+
         if (status === 'authenticated') {
             // Clear backend progress for logged-in users
             fetch('/api/learn-progress', {
@@ -427,24 +427,24 @@ export default function Page() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answeredIds: [], correctIds: [] }),
             })
-            .then(res => {
-                console.log('Progress reset response status:', res.status);
-                return res.json();
-            })
-            .then(data => {
-                console.log('Progress reset response:', data);
-                toast.success('Progress reset successfully!', { id: loadingToast });
-                setResetLoading(false);
-                // Force a page reload to ensure clean state
-                setTimeout(() => window.location.reload(), 1500);
-            })
-            .catch(error => {
-                console.error('Error resetting progress:', error);
-                toast.error('Failed to reset progress. Please try again.', { id: loadingToast });
-                setResetLoading(false);
-                // Force a page reload even if there's an error
-                setTimeout(() => window.location.reload(), 2000);
-            });
+                .then(res => {
+                    console.log('Progress reset response status:', res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Progress reset response:', data);
+                    toast.success('Progress reset successfully!', { id: loadingToast });
+                    setResetLoading(false);
+                    // Force a page reload to ensure clean state
+                    setTimeout(() => window.location.reload(), 1500);
+                })
+                .catch(error => {
+                    console.error('Error resetting progress:', error);
+                    toast.error('Failed to reset progress. Please try again.', { id: loadingToast });
+                    setResetLoading(false);
+                    // Force a page reload even if there's an error
+                    setTimeout(() => window.location.reload(), 2000);
+                });
         } else {
             // For guests, just reload the page to ensure clean state
             toast.success('Progress reset successfully!', { id: loadingToast });
@@ -466,342 +466,182 @@ export default function Page() {
 
     if (loading) {
         return (
-            <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600 animate-pulse">Loading questions...</p>
-                        <div className="mt-4 space-y-2">
-                            <div className="h-4 bg-gray-200 rounded animate-pulse w-48 mx-auto"></div>
-                            <div className="h-4 bg-gray-200 rounded animate-pulse w-32 mx-auto"></div>
-                        </div>
-                    </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mx-auto mb-6"></div>
+                    <p className="text-xl font-bold text-slate-900 animate-pulse">Initializing Practice Environment...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (questions.length === 0) {
+        return (
+            <div className="min-h-screen bg-slate-50 pt-24 pb-20 text-center">
+                <div className="max-w-2xl mx-auto glass-card">
+                    <h1 className="text-3xl font-black text-slate-900 mb-4">No Questions Found</h1>
+                    <p className="text-slate-600 mb-8">It looks like the question bank is empty. Please check your database connection or seed the database.</p>
+                    <Link href="/" className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold inline-block">Back to Home</Link>
                 </div>
             </div>
         );
     }
 
     return (
-        <>
-            <ConfirmDialog
-                isOpen={showResetConfirm}
-                onClose={() => setShowResetConfirm(false)}
-                onConfirm={confirmResetProgress}
-                title="Reset Progress"
-                message="Are you sure you want to reset your learn progress? This will clear all your answered questions and you will need to start over. This action cannot be undone."
-                confirmText="Reset Progress"
-                cancelText="Cancel"
-                type="danger"
-                loading={resetLoading}
-            />
-            <ConfirmDialog
-                isOpen={showShuffleConfirm}
-                onClose={() => setShowShuffleConfirm(false)}
-                onConfirm={confirmShuffleQuestions}
-                title="Shuffle Questions"
-                message="Are you sure you want to shuffle the questions? This will change the order of all questions on the current page."
-                confirmText="Shuffle Questions"
-                cancelText="Cancel"
-                type="warning"
-                loading={shuffling}
-            />
-            <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-8">
-            {/* Header Section */}
-            <div className="text-center space-y-4">
-                <div className="flex items-center justify-center space-x-2">
-                    <BookOpen className="w-8 h-8 text-blue-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Learning Mode</h1>
-                </div>
-                <p className="text-gray-600 max-w-2xl mx-auto">
-                    Master CEH concepts at your own pace. Answer questions, get instant feedback, and track your progress.
-                </p>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-blue-100 text-sm font-medium">Progress</p>
-                            <p className="text-2xl font-bold">{progressPercent}%</p>
-                        </div>
-                        <Target className="w-8 h-8 text-blue-200" />
-                    </div>
-                    <div className="mt-2">
-                        <div className="w-full bg-blue-400 rounded-full h-2">
-                            <div className="bg-white h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-green-100 text-sm font-medium">Completed</p>
-                            <p className="text-2xl font-bold">{totalAnswered}</p>
-                        </div>
-                        <CheckCircle className="w-8 h-8 text-green-200" />
-                    </div>
-                    <p className="text-green-100 text-sm mt-1">of {totalQuestions} questions</p>
-                </div>
-
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-purple-100 text-sm font-medium">Streak</p>
-                            <p className="text-2xl font-bold">{getStreak()}</p>
-                        </div>
-                        <TrendingUp className="w-8 h-8 text-purple-200" />
-                    </div>
-                    <p className="text-purple-100 text-sm mt-1">
-                        {status === 'authenticated' && longestStreak > 0 
-                            ? `Best: ${longestStreak} days` 
-                            : 'days active'
-                        }
-                    </p>
-                </div>
-
-                <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-4 shadow-lg">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-orange-100 text-sm font-medium">Accuracy</p>
-                            <p className="text-2xl font-bold">{getAccuracy()}%</p>
-                        </div>
-                        <Award className="w-8 h-8 text-orange-200" />
-                    </div>
-                    <p className="text-orange-100 text-sm mt-1">
-                        {Object.values(correctAnswers).filter(isCorrect => isCorrect).length} of {totalAnswered} correct
-                    </p>
-                </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
-                <div className="flex items-center space-x-4">
-                    {totalAnswered > 0 && (
-                        <button
-                            onClick={handleResetProgress}
-                            className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 shadow-lg"
-                            title="Reset all progress and start over"
-                        >
-                            <RotateCcw className="w-4 h-4" />
-                            <span>Reset Progress</span>
-                        </button>
-                    )}
-                    <button
-                        onClick={() => setShowShuffleConfirm(true)}
-                        disabled={shuffling}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-semibold shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400 ${
-                            shuffling 
-                                ? 'bg-purple-400 text-white cursor-not-allowed' 
-                                : 'bg-purple-600 text-white hover:bg-purple-700'
-                        }`}
-                    >
-                        {shuffling ? (
-                            <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                <span>Shuffling...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Shuffle className="w-4 h-4" />
-                                <span>Shuffle Questions</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-                
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Clock className="w-4 h-4" />
-                    <span>Take your time to learn and understand each concept</span>
-                </div>
-            </div>
-            {questions.length === 0 ? (
-                <div className="text-center py-8">
-                    <p className="text-gray-600">No questions available.</p>
-                </div>
-            ) : (
-                currentQuestions.map((q, index) => {
-                const userAnswers = answers[q.id] || [];
-                const correctAnswerOptions = q.options
-                    .filter(o => o.is_correct)
-                    .map(o => o.option_letter);
-                const hasSubmitted = submitted[q.id];
-                console.log("Correct Answer Options:", correctAnswerOptions);
-                
-                // Check if the user's answer is correct - use the stored value from state
-                const isCorrect = hasSubmitted ? correctAnswers[q.id] === true : false;
-                
-                console.log('Render:', {
-                  qid: q.id,
-                  question: q.question_text,
-                  correctAnswerOptions,
-                  userAnswers,
-                  isCorrect,
-                  hasSubmitted,
-                  correctAnswersValue: correctAnswers[q.id]
-                });
-                const canSubmit = userAnswers.length > 0 && !hasSubmitted;
-
-                return (
-                    <div
-                        key={q.id}
-                        ref={el => questionRefs.current[index] = el}
-                        className={`bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-8 border transition-all duration-300 hover:shadow-2xl ${
-                            hasSubmitted
-                                ? isCorrect
-                                    ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
-                                    : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
-                                : 'border-gray-100 hover:border-blue-200'
-                        }`}
-                        tabIndex={0}
-                        aria-labelledby={`question-title-${q.id}`}
-                    >
-                        <div className="flex items-start justify-between mb-6">
+        <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-50 via-white to-indigo-50 pt-24 pb-20">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                {!isComplete ? (
+                    <div className="space-y-8 animate-fade-in">
+                        {/* Progress Header */}
+                        <div className="glass-card !p-6 flex items-center justify-between gap-6">
                             <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                    <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
-                                        Question {(currentPage - 1) * ItemsPerPage + index + 1}
-                                    </span>
-                                    {!hasSubmitted && (
-                                        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
-                                            Learning Mode
-                                        </span>
-                                    )}
-
+                                <div className="flex items-center justify-between mb-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                                    <span>Progress</span>
+                                    <span className="text-indigo-600">{currentQuestionIndex + 1} / {questions.length}</span>
                                 </div>
-                                <h2 id={`question-title-${q.id}`} className="text-lg sm:text-xl font-bold text-gray-900 leading-relaxed">
-                                    {q.question_text}
-                                </h2>
+                                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full premium-gradient transition-all duration-500 ease-out"
+                                        style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-black text-slate-900">{score}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Points</div>
                             </div>
                         </div>
-                        <div className="space-y-3">
-                            {q.options && q.options.map((opt) => {
-                                const isSelected = userAnswers.includes(opt.option_letter);
-                                const isCorrectOption = opt.is_correct;
 
-                                // after submission, for each option:
-                                // selected & correct: green bg + checkmark
-                                // selected & wrong: red bg + cross
-                                // unselected & correct: green border + subtle highlight (to show correct answer)
-                                // unselected & wrong: normal
+                        {/* Question Card */}
+                        <div className="glass-card relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600" />
+                            <div className="mb-8">
+                                <span className="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black tracking-widest uppercase mb-4">
+                                    Domain {questions[currentQuestionIndex].domainId || 'Core'}
+                                </span>
+                                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 leading-tight">
+                                    {questions[currentQuestionIndex].question_text || questions[currentQuestionIndex].question}
+                                </h2>
+                            </div>
 
-                                const optionClass = hasSubmitted
-                                    ? isSelected && isCorrectOption
-                                        ? 'border-green-600 bg-green-100 text-green-800 animate-pulse'
-                                        : isSelected && !isCorrectOption
-                                            ? 'border-red-600 bg-red-100 text-red-800 animate-shake'
-                                            : !isSelected && isCorrectOption
-                                                ? 'border-green-400 bg-green-50 text-green-700'
-                                                : 'border-gray-300 bg-white text-gray-700'
-                                    : isSelected
-                                        ? 'border-blue-500 bg-blue-100 shadow-md'
-                                        : 'border-gray-300 bg-white hover:bg-blue-50 hover:border-blue-400';
+                            <div className="grid gap-4">
+                                {(questions[currentQuestionIndex].options || []).map((option, index) => {
+                                    const optionText = typeof option === 'string' ? option : option.option_text;
+                                    const optionLetter = typeof option === 'string' ? option : option.option_letter;
+                                    const isSelected = selectedAnswer === optionLetter || selectedAnswer === optionText;
 
-                                return (
-                                    <label
-                                        key={opt.id}
-                                        className={`flex items-center p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer group focus-within:ring-2 focus-within:ring-blue-400 ${optionClass}`}
-                                        tabIndex={0}
-                                        aria-checked={isSelected}
-                                        aria-label={`Option ${opt.option_letter}: ${opt.option_text}`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            disabled={hasSubmitted}
-                                            name={`question-${q.id}`}
-                                            value={opt.option_letter}
-                                            checked={isSelected}
-                                            onChange={() => handleAnswer(q.id, opt.option_letter)}
-                                            className="mr-4 w-5 h-5 accent-blue-600 rounded-full focus:ring-2 focus:ring-blue-400"
-                                            aria-checked={isSelected}
-                                            aria-label={`Select option ${opt.option_letter}`}
-                                        />
-                                        <span className="flex-grow text-xs sm:text-sm md:text-base lg:text-lg font-medium">{opt.option_letter}. {opt.option_text}</span>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                        <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-                            {!hasSubmitted ? (
-                                <div className="flex items-center space-x-4">
-                                    <button
-                                        onClick={() => handleSubmit(q.id, index)}
-                                        className={`px-6 py-3 rounded-lg font-semibold shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                                            canSubmit 
-                                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transform hover:scale-105' 
-                                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        }`}
-                                        disabled={!canSubmit || submitting[q.id]}
-                                        aria-disabled={!canSubmit || submitting[q.id]}
-                                    >
-                                        {submitting[q.id] ? (
-                                            <div className="flex items-center space-x-2">
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                <span>Saving...</span>
+                                    // Handle correct answer logic based on data structure
+                                    const isCorrectAnswer = (opt) => {
+                                        if (typeof opt === 'string') return opt === questions[currentQuestionIndex].correctAnswer;
+                                        return opt.is_correct;
+                                    };
+
+                                    const isCorrect = showFeedback && isCorrectAnswer(option);
+                                    const isWrong = showFeedback && isSelected && !isCorrectAnswer(option);
+
+                                    return (
+                                        <button
+                                            key={index}
+                                            disabled={showFeedback}
+                                            onClick={() => handleAnswerSelect(optionLetter)}
+                                            className={`group relative text-left p-6 rounded-2xl border-2 transition-all duration-300 ${isSelected && !showFeedback ? 'border-indigo-600 bg-indigo-50/50 shadow-lg' :
+                                                    isCorrect ? 'border-emerald-500 bg-emerald-50 shadow-lg' :
+                                                        isWrong ? 'border-rose-500 bg-rose-50 shadow-lg' :
+                                                            'border-white/50 bg-white/30 hover:border-indigo-200 hover:bg-white hover:shadow-md'
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-colors ${isSelected || isCorrect || isWrong ? 'bg-white shadow-sm' : 'bg-slate-100'
+                                                    } ${isCorrect ? 'text-emerald-600' :
+                                                        isWrong ? 'text-rose-600' :
+                                                            isSelected ? 'text-indigo-600' : 'text-slate-400'
+                                                    }`}>
+                                                    {String.fromCharCode(65 + index)}
+                                                </div>
+                                                <span className={`text-lg font-semibold ${isSelected || isCorrect || isWrong ? 'text-slate-900' : 'text-slate-600'
+                                                    }`}>
+                                                    {optionText}
+                                                </span>
+                                                {(isCorrect || isWrong) && (
+                                                    <div className="ml-auto">
+                                                        {isCorrect ? (
+                                                            <CheckCircle className="w-6 h-6 text-emerald-600" />
+                                                        ) : (
+                                                            <X className="w-6 h-6 text-rose-600" />
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : (
-                                            <div className="flex items-center space-x-2">
-                                                <CheckCircle className="w-4 h-4" />
-                                                <span>Submit Answer</span>
-                                            </div>
-                                        )}
-                                    </button>
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
-                                </div>
-                            ) : (
-                                <div className="flex items-center space-x-4">
-                                    <div className="flex items-center bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium">
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        <span>Question Completed</span>
+                            {showFeedback && (
+                                <div className="mt-10 pt-10 border-t border-slate-100 animate-fade-in-up">
+                                    <div className={`p-6 rounded-2xl ${selectedAnswer === questions[currentQuestionIndex].correctAnswer ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900'
+                                        }`}>
+                                        <h4 className="font-black text-sm uppercase tracking-widest mb-3">
+                                            {selectedAnswer === questions[currentQuestionIndex].correctAnswer ? 'Excellent Work!' : 'Not quite right'}
+                                        </h4>
+                                        <p className="text-lg leading-relaxed mb-6">
+                                            {questions[currentQuestionIndex].explanation}
+                                        </p>
+                                        <button
+                                            onClick={handleNextQuestion}
+                                            className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all hover:scale-105 active:scale-95"
+                                        >
+                                            {currentQuestionIndex === questions.length - 1 ? 'Finish Study' : 'Next Question'}
+                                            <ArrowRight className="w-5 h-5" />
+                                        </button>
                                     </div>
-                                    <p className="text-sm text-gray-600">Great job! You&apos;ve learned this concept.</p>
-                                </div>
-                            )}
-                            
-                            {hasSubmitted && (
-                                <div className="text-right">
-                                    <p className="text-xs text-gray-500">Scroll down for next question</p>
                                 </div>
                             )}
                         </div>
                     </div>
-                );
-            })
-            )}
-            {/* Pagination */}
-            <div className="flex justify-center mt-8">
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={(page) => setCurrentPage(page)}
-                />
-            </div>
+                ) : (
+                    <div className="max-w-2xl mx-auto text-center animate-fade-in">
+                        <div className="mb-12 relative inline-block">
+                            <div className="p-8 bg-white rounded-[3rem] shadow-2xl glass-morphism">
+                                <Trophy className="w-32 h-32 text-yellow-500 drop-shadow-2xl mx-auto" />
+                            </div>
+                            <div className="absolute -bottom-4 -right-4 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black shadow-xl border-4 border-white animate-bounce-slow">
+                                COMPLETE
+                            </div>
+                        </div>
 
-            {/* Footer */}
-            <div className="text-center py-8 border-t border-gray-200">
-                <div className="flex items-center justify-center space-x-2 text-gray-600">
-                    <BookOpen className="w-5 h-5" />
-                    <p className="text-sm">
-                        Keep learning and improving your CEH knowledge!
-                    </p>
-                </div>
+                        <h1 className="text-5xl font-black text-slate-900 mb-6">Great Progress!</h1>
+                        <p className="text-xl text-slate-600 mb-12 font-medium">
+                            You've completed the study module. Here's a summary of your performance.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-6 mb-12">
+                            <div className="glass-card !p-8">
+                                <div className="text-4xl font-black text-indigo-600 mb-2">{score}</div>
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total score</div>
+                            </div>
+                            <div className="glass-card !p-8">
+                                <div className="text-4xl font-black text-emerald-600 mb-2">
+                                    {Math.round((score / (questions.length * 10)) * 100)}%
+                                </div>
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Accuracy</div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 px-8 py-5 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-1 transition-all"
+                            >
+                                Study Again
+                            </button>
+                            <Link href="/" className="flex-1 px-8 py-5 bg-white text-slate-900 border-2 border-slate-100 rounded-2xl font-bold shadow-sm hover:bg-slate-50 transition-all">
+                                Back to Home
+                            </Link>
+                        </div>
+                    </div>
+                )}
             </div>
-            <style jsx global>{`
-                @keyframes animate-shake {
-                    10%, 90% { transform: translateX(-1px); }
-                    20%, 80% { transform: translateX(2px); }
-                    30%, 50%, 70% { transform: translateX(-4px); }
-                    40%, 60% { transform: translateX(4px); }
-                }
-                .animate-shake { animation: animate-shake 0.5s; }
-                @keyframes animate-fade-in {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                .animate-fade-in { animation: animate-fade-in 0.7s; }
-            `}</style>
         </div>
-        </>
     );
 }
